@@ -6,6 +6,7 @@ import SideModal from '@/Components/SideModal.vue';
 import FormField from '@/Components/FormField.vue';
 import TextInput from '@/Components/TextInput.vue';
 import SelectInput from '@/Components/SelectInput.vue';
+import Badge from '@/Components/Badge.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
 
@@ -15,25 +16,26 @@ const props = defineProps({
     expenses: Array,
     employees: Array,
     banks: Array,
-    total_expenses_period: Number,
-    total_expenses_month: Number,
+    summary: Object,
     filters: Object,
 });
 
 const showAddModal = ref(false);
-const showCustomRange = ref(props.filters.filter === 'custom' || (props.filters.start_date && props.filters.end_date));
+const showFilters = ref(false);
 const search = ref(props.filters.search || '');
-
-const customRange = ref({
-    start: props.filters.start_date || '',
-    end: props.filters.end_date || '',
-});
+const selectedCategory = ref(props.filters.category || 'All');
 
 const form = useForm({
     date: new Date().toISOString().substr(0, 10),
     employee_id: '',
+    expense_number: '',
     description: '',
+    category: 'Office',
+    supplier_person: '',
     amount: '',
+    payment_method: 'Cash',
+    status: 'Paid',
+    bank_id: '',
 });
 
 const submit = () => {
@@ -45,254 +47,351 @@ const submit = () => {
     });
 };
 
-const applyFilter = (filterType) => {
-    if (filterType === 'custom') {
-        showCustomRange.value = !showCustomRange.value;
-        return;
-    }
-    showCustomRange.value = false;
-    router.get('/expenses', { filter: filterType }, { preserveState: true, preserveScroll: true });
-};
-
-const applyCustomRange = () => {
-    if (customRange.value.start && customRange.value.end) {
-        router.get('/expenses', { 
-            filter: 'custom', 
-            start_date: customRange.value.start, 
-            end_date: customRange.value.end 
-        }, { preserveState: true, preserveScroll: true });
-    }
-};
-
-const resetFilters = () => {
-    search.value = '';
-    showCustomRange.value = false;
-    router.get('/expenses', {}, { preserveState: true, preserveScroll: true });
-};
-
 const handleSearch = () => {
     router.get('/expenses', { 
         search: search.value,
-        filter: props.filters.filter,
-        start_date: props.filters.start_date,
-        end_date: props.filters.end_date
+        category: selectedCategory.value,
+        filter: props.filters.filter
     }, { preserveState: true, preserveScroll: true });
 };
 
-const employeeOptions = computed(() => 
-    props.employees.map(e => ({ label: e.name, value: e.id }))
-);
-
-const getInitials = (name) => {
-    return name.split(' ').map(n => n[0]).join('').toUpperCase().substr(0, 2);
-};
+watch(selectedCategory, () => handleSearch());
 
 const formatCurrency = (value) => {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
+    return new Intl.NumberFormat('en-AE', { style: 'currency', currency: 'AED' }).format(value);
 };
+
+const getCategoryVariant = (cat) => {
+    switch (cat) {
+        case 'Shipping': return 'primary';
+        case 'Office': return 'success';
+        case 'Transport': return 'orange';
+        case 'Salary': return 'purple';
+        case 'Bank': return 'info';
+        default: return 'neutral';
+    }
+};
+
+const getStatusVariant = (status) => {
+    switch (status) {
+        case 'Paid': return 'success';
+        case 'Partial': return 'warning';
+        case 'Unpaid': return 'error';
+        default: return 'neutral';
+    }
+};
+
+const categories = ['All', 'Office', 'Shipping', 'Transport', 'Salary', 'Bank', 'Other'];
+const paymentMethods = ['Cash', 'Bank Transfer'];
+const statuses = ['Paid', 'Partial', 'Unpaid'];
 </script>
 
 <template>
-    <Head title="Expenses Management" />
+    <Head title="Expenses" />
 
-    <div class="space-y-8 animate-in fade-in duration-500">
-        <!-- Header Section -->
-        <div class="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-4">
-            <div class="space-y-2 max-w-xl">
-                <h1 class="text-3xl sm:text-4xl font-headline font-extrabold tracking-tight text-on-background">Expenses Management</h1>
-                <p class="text-on-surface-variant font-body text-base">Track organizational spending and manage employee reimbursements effortlessly.</p>
+    <div class="space-y-6 animate-in fade-in duration-500">
+        <!-- Breadcrumbs / Page Header -->
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div>
+                <h1 class="text-2xl font-headline font-bold text-on-surface tracking-tight">Expenses</h1>
+                <p class="text-sm text-outline font-label">Track and manage all company expenses</p>
             </div>
-            
-            <PrimaryButton @click="showAddModal = true" class="w-fit flex items-center gap-2">
-                <span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">add</span>
-                Log Expense
-            </PrimaryButton>
+            <div class="flex items-center gap-3">
+                <button class="bg-surface-container-low border border-outline-variant/30 px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-surface-container-high transition-colors">
+                    <span class="material-symbols-outlined text-[18px]">calendar_today</span>
+                    Apr 28, 2024
+                </button>
+                <button class="bg-surface-container-low border border-outline-variant/30 p-2 rounded-lg relative">
+                    <span class="material-symbols-outlined">notifications</span>
+                    <span class="absolute top-1 right-1 w-2 h-2 bg-error rounded-full"></span>
+                </button>
+            </div>
         </div>
 
-        <!-- Filters & Search Bar -->
-        <div class="flex flex-col gap-4">
-            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-surface-container-lowest p-2 rounded-xl border border-outline-variant/10 shadow-sm transition-colors">
-                <div class="flex bg-surface-container-low rounded-lg p-1">
-                    <button 
-                        @click="applyFilter('week')"
-                        class="px-4 py-2 text-sm font-label font-medium rounded-md transition-colors"
-                        :class="[filters.filter === 'week' ? 'bg-surface-container-lowest text-tertiary shadow-sm font-bold' : 'text-on-surface-variant hover:text-on-surface']"
-                    >
-                        This Week
-                    </button>
-                    <button 
-                        @click="applyFilter('month')"
-                        class="px-4 py-2 text-sm font-label font-medium rounded-md transition-colors"
-                        :class="[filters.filter === 'month' ? 'bg-surface-container-lowest text-tertiary shadow-sm font-bold' : 'text-on-surface-variant hover:text-on-surface']"
-                    >
-                        This Month
-                    </button>
-                    <button 
-                        @click="applyFilter('custom')"
-                        class="px-4 py-2 text-sm font-label font-medium rounded-md transition-colors flex items-center gap-1"
-                        :class="[showCustomRange || filters.filter === 'custom' ? 'bg-surface-container-lowest text-tertiary shadow-sm font-bold' : 'text-on-surface-variant hover:text-on-surface']"
-                    >
-                        Custom Range
-                        <span class="material-symbols-outlined text-[16px]">calendar_today</span>
-                    </button>
-                </div>
-
-                <div class="flex items-center gap-2 px-2 w-full sm:w-auto">
-                    <div class="relative flex items-center w-full sm:w-64">
-                        <span class="material-symbols-outlined absolute left-3 text-on-surface-variant text-[20px]">search</span>
-                        <input 
-                            v-model="search"
-                            @keyup.enter="handleSearch"
-                            type="text" 
-                            placeholder="Search expenses..." 
-                            class="w-full pl-10 pr-4 py-2 bg-surface-container-high rounded-lg border border-outline-variant/10 focus:outline-none focus:border-tertiary focus:ring-4 focus:ring-tertiary/10 text-sm font-body transition-all"
-                        />
+        <!-- KPI Cards (Top Rows) -->
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <!-- Card 1 -->
+            <div class="bg-surface-container-lowest border border-outline-variant/20 p-5 rounded-2xl shadow-sm">
+                <div class="flex items-start justify-between mb-4">
+                    <div class="p-3 bg-primary/10 rounded-xl">
+                        <span class="material-symbols-outlined text-primary">account_balance_wallet</span>
                     </div>
-                    <button @click="resetFilters" class="p-2 text-outline hover:text-error transition-colors" title="Clear All Filters">
-                        <span class="material-symbols-outlined">filter_alt_off</span>
-                    </button>
+                </div>
+                <div class="space-y-1">
+                    <p class="text-[10px] font-bold text-outline uppercase tracking-widest">Total Expenses</p>
+                    <h3 class="text-xl font-headline font-black text-on-surface">{{ formatCurrency(summary.total) }}</h3>
+                    <p class="text-[10px] text-emerald-500 font-bold flex items-center gap-1">
+                        <span class="material-symbols-outlined text-[12px]">trending_up</span>
+                        8.3% from last week
+                    </p>
                 </div>
             </div>
 
-            <!-- Custom Range Inputs -->
-            <Transition
-                enter-active-class="transition duration-200 ease-out"
-                enter-from-class="transform -translate-y-2 opacity-0"
-                enter-to-class="transform translate-y-0 opacity-100"
-            >
-                <div v-if="showCustomRange" class="flex flex-col sm:flex-row items-end gap-4 bg-surface-container-low/50 p-4 rounded-xl border border-outline-variant/10">
-                    <div class="w-full sm:w-auto">
-                        <label class="block text-[10px] font-bold uppercase tracking-widest text-outline mb-1 mx-1">Start Date</label>
-                        <TextInput v-model="customRange.start" type="date" class="!py-2" />
+            <!-- Card 2 -->
+            <div class="bg-surface-container-lowest border border-outline-variant/20 p-5 rounded-2xl shadow-sm">
+                <div class="flex items-start justify-between mb-4">
+                    <div class="p-3 bg-emerald-500/10 rounded-xl">
+                        <span class="material-symbols-outlined text-emerald-500">business</span>
                     </div>
-                    <div class="w-full sm:w-auto">
-                        <label class="block text-[10px] font-bold uppercase tracking-widest text-outline mb-1 mx-1">End Date</label>
-                        <TextInput v-model="customRange.end" type="date" class="!py-2" />
+                </div>
+                <div class="space-y-1">
+                    <p class="text-[10px] font-bold text-outline uppercase tracking-widest">Office Expenses</p>
+                    <h3 class="text-xl font-headline font-black text-on-surface">{{ formatCurrency(summary.office) }}</h3>
+                    <p class="text-[10px] text-outline font-bold">45.7% of total</p>
+                </div>
+            </div>
+
+            <!-- Card 3 -->
+            <div class="bg-surface-container-lowest border border-outline-variant/20 p-5 rounded-2xl shadow-sm">
+                <div class="flex items-start justify-between mb-4">
+                    <div class="p-3 bg-purple-500/10 rounded-xl">
+                        <span class="material-symbols-outlined text-purple-500">local_shipping</span>
                     </div>
-                    <PrimaryButton @click="applyCustomRange" class="w-full sm:w-auto !py-2.5 !px-6 bg-tertiary border-tertiary hover:bg-tertiary/90">
-                        Apply Range
+                </div>
+                <div class="space-y-1">
+                    <p class="text-[10px] font-bold text-outline uppercase tracking-widest">Shipping Expenses</p>
+                    <h3 class="text-xl font-headline font-black text-on-surface">{{ formatCurrency(summary.shipping) }}</h3>
+                    <p class="text-[10px] text-outline font-bold">40.2% of total</p>
+                </div>
+            </div>
+
+            <!-- Card 4 -->
+            <div class="bg-surface-container-lowest border border-outline-variant/20 p-5 rounded-2xl shadow-sm">
+                <div class="flex items-start justify-between mb-4">
+                    <div class="p-3 bg-orange-500/10 rounded-xl">
+                        <span class="material-symbols-outlined text-orange-500">groups</span>
+                    </div>
+                </div>
+                <div class="space-y-1">
+                    <p class="text-[10px] font-bold text-outline uppercase tracking-widest">Employee Expenses</p>
+                    <h3 class="text-xl font-headline font-black text-on-surface">{{ formatCurrency(summary.employee) }}</h3>
+                    <p class="text-[10px] text-outline font-bold">14.1% of total</p>
+                </div>
+            </div>
+
+            <!-- Card 5 -->
+            <div class="bg-surface-container-lowest border border-outline-variant/20 p-5 rounded-2xl shadow-sm">
+                <div class="flex items-start justify-between mb-4">
+                    <div class="p-3 bg-sky-500/10 rounded-xl">
+                        <span class="material-symbols-outlined text-sky-500">assignment</span>
+                    </div>
+                </div>
+                <div class="space-y-1">
+                    <p class="text-[10px] font-bold text-outline uppercase tracking-widest">This Month</p>
+                    <h3 class="text-xl font-headline font-black text-on-surface">{{ summary.this_month_count }}</h3>
+                    <p class="text-[10px] text-outline font-bold">Total Expenses</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Table & Filters Container -->
+        <div class="bg-surface-container-lowest border border-outline-variant/20 rounded-2xl shadow-sm overflow-hidden transition-all">
+            <!-- Toolbar -->
+            <div class="p-4 border-b border-outline-variant/20 flex flex-col md:flex-row justify-between items-center gap-4">
+                <div class="flex items-center gap-2">
+                    <SelectInput v-model="form.filter" :options="[{label: 'This Month', value: 'month'}]" class="!w-32 !py-1.5" />
+                    <SelectInput v-model="selectedCategory" :options="categories.map(c => ({label: c, value: c}))" class="!w-40 !py-1.5" />
+                </div>
+                
+                <div class="flex flex-1 max-w-md relative">
+                    <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[18px]">search</span>
+                    <input 
+                        v-model="search"
+                        @keyup.enter="handleSearch"
+                        type="text" 
+                        placeholder="Search expense, supplier, note..." 
+                        class="w-full pl-10 pr-4 py-2 bg-surface-container-low rounded-xl border border-outline-variant/20 focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm font-label transition-all"
+                    />
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <button @click="showFilters = !showFilters" class="p-2 border border-outline-variant/20 rounded-lg hover:bg-surface-container-high transition-colors flex items-center gap-2 text-sm font-bold">
+                        <span class="material-symbols-outlined text-[18px]">tune</span>
+                        Filters
+                    </button>
+                    <PrimaryButton @click="showAddModal = true" class="flex items-center gap-2 !py-2">
+                        <span class="material-symbols-outlined text-[18px]">add</span>
+                        Add Expense
                     </PrimaryButton>
-                </div>
-            </Transition>
-        </div>
-
-        <!-- Expenses Table -->
-        <div class="bg-surface-container-lowest rounded-xl border border-outline-variant/20 overflow-hidden shadow-sm transition-colors">
-            <div class="p-6 pb-2">
-                <h2 class="text-lg font-headline font-bold text-on-background">Activity Stream</h2>
-            </div>
-            
-            <div class="w-full px-6">
-                <!-- Table Header -->
-                <div class="grid grid-cols-12 gap-4 pb-3 border-b border-surface-container-high text-[11px] font-label font-bold text-on-surface-variant uppercase tracking-wider">
-                    <div class="col-span-3 sm:col-span-2">Date</div>
-                    <div class="col-span-5 sm:col-span-4">Employee</div>
-                    <div class="hidden sm:block col-span-4">Description</div>
-                    <div class="col-span-4 sm:col-span-2 text-right">Amount</div>
-                </div>
-
-                <!-- Table Rows -->
-                <div class="flex flex-col gap-1 py-4 mb-2">
-                    <div 
-                        v-for="(expense, index) in expenses" 
-                        :key="expense.id"
-                        class="grid grid-cols-12 gap-4 items-center p-3 rounded-lg hover:bg-surface-container-high/50 transition-colors cursor-pointer group"
-                        :class="{ 'bg-surface-container-low/30': index % 2 !== 0 }"
-                    >
-                        <div class="col-span-3 sm:col-span-2 text-sm font-body text-on-surface">{{ expense.date }}</div>
-                        <div class="col-span-5 sm:col-span-4 flex items-center gap-3">
-                            <div class="w-8 h-8 rounded-full bg-tertiary-container flex items-center justify-center text-on-tertiary-container text-[10px] font-bold font-headline shrink-0">
-                                {{ getInitials(expense.employee.name) }}
-                            </div>
-                            <div class="flex flex-col min-w-0">
-                                <span class="text-sm font-body text-on-background font-bold truncate">{{ expense.employee.name }}</span>
-                                <span class="sm:hidden text-[10px] text-outline truncate">{{ expense.description }}</span>
-                            </div>
-                        </div>
-                        <div class="hidden sm:block col-span-4 text-sm font-body text-on-surface-variant truncate">
-                            {{ expense.description }}
-                        </div>
-                        <div class="col-span-4 sm:col-span-2 text-right text-sm font-body text-error font-bold">
-                            -{{ formatCurrency(expense.amount) }}
-                        </div>
-                    </div>
+                    <button class="p-2 border border-outline-variant/20 rounded-lg hover:bg-surface-container-high transition-colors flex items-center gap-2 text-sm font-bold">
+                        <span class="material-symbols-outlined text-[18px]">ios_share</span>
+                        Export
+                    </button>
                 </div>
             </div>
 
-            <div v-if="expenses.length === 0" class="p-12 text-center text-outline">
-                No expenses found for the selected filter.
+            <!-- Table -->
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-surface-container-low/50 text-[11px] font-bold text-outline uppercase tracking-wider">
+                            <th class="px-6 py-4">Date <span class="material-symbols-outlined text-[14px] align-middle">unfold_more</span></th>
+                            <th class="px-6 py-4">Expense #</th>
+                            <th class="px-6 py-4">Description</th>
+                            <th class="px-6 py-4">Category</th>
+                            <th class="px-6 py-4">Supplier / Person</th>
+                            <th class="px-6 py-4">Amount (AED)</th>
+                            <th class="px-6 py-4">Payment Method</th>
+                            <th class="px-6 py-4">Status</th>
+                            <th class="px-6 py-4 text-center">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-outline-variant/10">
+                        <tr v-for="expense in expenses" :key="expense.id" class="hover:bg-surface-container-low/30 transition-colors group">
+                            <td class="px-6 py-4 text-xs font-bold text-on-surface-variant">{{ expense.date }}</td>
+                            <td class="px-6 py-4 text-xs font-bold text-on-surface">{{ expense.expense_number || 'EXP-' + (1000 + expense.id) }}</td>
+                            <td class="px-6 py-4 text-xs text-on-surface-variant">{{ expense.description }}</td>
+                            <td class="px-6 py-4">
+                                <Badge :variant="getCategoryVariant(expense.category)">{{ expense.category }}</Badge>
+                            </td>
+                            <td class="px-6 py-4 text-xs font-bold text-on-surface">{{ expense.supplier_person || expense.employee?.name }}</td>
+                            <td class="px-6 py-4 text-xs font-black text-on-surface">{{ formatCurrency(expense.amount).replace('AED', '') }}</td>
+                            <td class="px-6 py-4">
+                                <span class="text-[10px] font-bold text-primary px-3 py-1 bg-primary/5 rounded-md border border-primary/10">
+                                    {{ expense.payment_method }}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4">
+                                <Badge :variant="getStatusVariant(expense.status)">{{ expense.status }}</Badge>
+                            </td>
+                            <td class="px-6 py-4 text-center">
+                                <div class="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button class="p-1.5 text-outline hover:text-primary transition-colors"><span class="material-symbols-outlined text-[18px]">visibility</span></button>
+                                    <button class="p-1.5 text-outline hover:text-emerald-500 transition-colors"><span class="material-symbols-outlined text-[18px]">edit</span></button>
+                                    <button class="p-1.5 text-outline hover:text-error transition-colors"><span class="material-symbols-outlined text-[18px]">delete</span></button>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr v-if="expenses.length === 0">
+                            <td colspan="9" class="px-6 py-12 text-center text-outline italic text-sm">No expenses found.</td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
-        </div>
 
-        <!-- Summary Section -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
-            <div class="md:col-span-2 bg-gradient-to-br from-tertiary to-[#ff6b3d] rounded-2xl p-8 text-on-tertiary shadow-xl relative overflow-hidden group">
-                <div class="absolute -top-12 -right-12 w-48 h-48 bg-white/10 rounded-full blur-2xl group-hover:scale-110 transition-transform duration-700"></div>
-                <div class="relative z-10 flex flex-col justify-between h-full">
-                    <div class="flex justify-between items-start mb-6">
-                        <div>
-                            <h3 class="text-on-tertiary-container font-label text-xs uppercase tracking-widest font-bold mb-1">Total Expenses</h3>
-                            <p class="text-white/70 text-[10px] font-body">Spending for the selected period</p>
-                        </div>
-                        <div class="p-3 bg-white/20 rounded-xl backdrop-blur-md">
-                            <span class="material-symbols-outlined text-on-tertiary" style="font-variation-settings: 'FILL' 1;">trending_down</span>
-                        </div>
-                    </div>
-                    <div class="flex items-baseline gap-4 mt-auto">
-                        <span class="text-4xl sm:text-5xl font-headline font-extrabold tracking-tighter">{{ formatCurrency(total_expenses_period) }}</span>
-                        <span class="text-[10px] font-bold bg-white/10 px-2 py-1 rounded-md backdrop-blur-sm uppercase">Expenditure Logged</span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/20 shadow-sm flex flex-col justify-between transition-colors">
-                <div class="flex justify-between items-start mb-4">
-                    <h3 class="text-on-surface-variant font-label text-[10px] uppercase font-bold tracking-widest">Monthly Totals</h3>
-                    <span class="material-symbols-outlined text-outline text-[20px]">payments</span>
-                </div>
-                <div>
-                    <div class="text-3xl font-headline font-bold text-on-background mb-1">{{ formatCurrency(total_expenses_month) }}</div>
-                    <div class="text-xs font-body text-outline font-bold flex items-center gap-1 uppercase tracking-tight">
-                        <span class="w-1.5 h-1.5 rounded-full bg-outline"></span>
-                        Current Month Spending
+            <!-- Pagination -->
+            <div class="p-4 bg-surface-container-low/30 flex justify-between items-center border-t border-outline-variant/20">
+                <p class="text-[10px] font-bold text-outline uppercase tracking-widest">Showing 1 to {{ expenses.length }} of {{ expenses.length }} expenses</p>
+                <div class="flex items-center gap-2">
+                    <button class="p-1 border border-outline-variant/30 rounded-md disabled:opacity-30" disabled><span class="material-symbols-outlined text-[18px]">chevron_left</span></button>
+                    <button class="px-3 py-1 bg-primary text-on-primary text-xs font-bold rounded-md">1</button>
+                    <button class="px-3 py-1 text-xs font-bold text-on-surface hover:bg-surface-container-high rounded-md">2</button>
+                    <button class="p-1 border border-outline-variant/30 rounded-md"><span class="material-symbols-outlined text-[18px]">chevron_right</span></button>
+                    
+                    <div class="ml-4 flex items-center gap-2">
+                        <span class="text-[10px] font-bold text-outline">10 / page</span>
+                        <span class="material-symbols-outlined text-[16px] text-outline">expand_more</span>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Add Expense Side Drawer -->
-        <SideModal 
-            :show="showAddModal" 
-            title="Log Expense" 
-            @close="showAddModal = false"
-        >
-            <form @submit.prevent="submit" class="space-y-6">
-                <FormField label="Employee" :error="form.errors.employee_id" required>
-                    <SelectInput v-model="form.employee_id" :options="employeeOptions" placeholder="Select employee..." />
-                </FormField>
+        <!-- Charts (Simulated for Now) -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="bg-surface-container-lowest border border-outline-variant/20 p-6 rounded-2xl shadow-sm">
+                <h3 class="text-sm font-headline font-bold text-on-surface mb-6">Expenses by Category</h3>
+                <div class="flex items-center justify-center py-8">
+                    <div class="w-48 h-48 rounded-full border-[16px] border-emerald-500 relative flex items-center justify-center">
+                        <div class="text-center">
+                            <p class="text-[10px] font-bold text-outline uppercase">AED</p>
+                            <p class="text-xl font-headline font-black text-on-surface">9,200</p>
+                            <p class="text-[10px] font-bold text-outline">Total</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="space-y-2 mt-4">
+                    <div class="flex justify-between items-center text-xs">
+                        <div class="flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                            <span class="text-outline font-medium">Office</span>
+                        </div>
+                        <div class="font-bold">AED 4,200 <span class="text-outline text-[10px] ml-1">45.7%</span></div>
+                    </div>
+                    <div class="flex justify-between items-center text-xs">
+                        <div class="flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-primary"></span>
+                            <span class="text-outline font-medium">Shipping</span>
+                        </div>
+                        <div class="font-bold">AED 3,700 <span class="text-outline text-[10px] ml-1">40.2%</span></div>
+                    </div>
+                </div>
+            </div>
 
-                <FormField label="Description" :error="form.errors.description" required>
-                    <TextInput v-model="form.description" placeholder="e.g. Office Supplies, Fuel, Rent" />
-                </FormField>
+            <div class="bg-surface-container-lowest border border-outline-variant/20 p-6 rounded-2xl shadow-sm md:col-span-2">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-sm font-headline font-bold text-on-surface">Monthly Trend</h3>
+                    <SelectInput :options="[{label: 'This Year', value: 'year'}]" class="!w-24 !py-1 !text-[10px]" />
+                </div>
+                <div class="h-64 flex items-end justify-between gap-2 pb-6 px-4 relative">
+                    <!-- Simple CSS Line Chart Simulation -->
+                    <div v-for="h in [40, 60, 45, 75, 55, 80]" :key="h" class="flex-1 bg-primary/10 rounded-t-lg relative group transition-all hover:bg-primary/20" :style="{height: h + '%'}">
+                        <div class="absolute -top-8 left-1/2 -translate-x-1/2 bg-on-surface text-surface text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">AED {{ h }}k</div>
+                    </div>
+                    <div class="absolute bottom-0 left-0 w-full flex justify-between px-4 text-[10px] font-bold text-outline uppercase tracking-tight">
+                        <span>Nov</span><span>Dec</span><span>Jan</span><span>Feb</span><span>Mar</span><span>Apr</span>
+                    </div>
+                </div>
+            </div>
+        </div>
 
+        <!-- Add Expense Modal -->
+        <SideModal :show="showAddModal" title="Add New Expense" @close="showAddModal = false">
+            <form @submit.prevent="submit" class="space-y-5 p-2">
                 <div class="grid grid-cols-2 gap-4">
                     <FormField label="Date" :error="form.errors.date" required>
                         <TextInput v-model="form.date" type="date" />
                     </FormField>
-
-                    <FormField label="Amount" :error="form.errors.amount" required>
-                        <TextInput v-model="form.amount" type="number" step="0.01" prefix="$" placeholder="0.00" />
+                    <FormField label="Expense #" :error="form.errors.expense_number">
+                        <TextInput v-model="form.expense_number" placeholder="EXP-1000" />
                     </FormField>
                 </div>
 
-                <!-- Footer -->
-                <div class="pt-6 flex justify-end gap-3 mt-8">
+                <FormField label="Description" :error="form.errors.description" required>
+                    <TextInput v-model="form.description" placeholder="e.g. Monthly Rent, Office Supplies" />
+                </FormField>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <FormField label="Category" :error="form.errors.category" required>
+                        <SelectInput v-model="form.category" :options="categories.filter(c => c !== 'All').map(c => ({label: c, value: c}))" />
+                    </FormField>
+                    <FormField label="Supplier / Person" :error="form.errors.supplier_person">
+                        <TextInput v-model="form.supplier_person" placeholder="e.g. Amazon, Employee Name" />
+                    </FormField>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <FormField label="Amount (AED)" :error="form.errors.amount" required>
+                        <TextInput v-model="form.amount" type="number" step="0.01" prefix="AED" placeholder="0.00" />
+                    </FormField>
+                    <FormField label="Employee Responsible" :error="form.errors.employee_id" required>
+                        <SelectInput v-model="form.employee_id" :options="employees.map(e => ({label: e.name, value: e.id}))" />
+                    </FormField>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <FormField label="Payment Method" :error="form.errors.payment_method" required>
+                        <SelectInput v-model="form.payment_method" :options="paymentMethods.map(m => ({label: m, value: m}))" />
+                    </FormField>
+                    <FormField label="Status" :error="form.errors.status" required>
+                        <SelectInput v-model="form.status" :options="statuses.map(s => ({label: s, value: s}))" />
+                    </FormField>
+                </div>
+
+                <FormField label="Bank Account (Optional)" :error="form.errors.bank_id">
+                    <SelectInput v-model="form.bank_id" :options="[{label: 'None', value: ''}, ...banks.map(b => ({label: b.name, value: b.id}))]" />
+                </FormField>
+
+                <div class="pt-6 flex justify-end gap-3 border-t border-outline-variant/10 mt-6">
                     <SecondaryButton @click="showAddModal = false" type="button">Cancel</SecondaryButton>
-                    <PrimaryButton :loading="form.processing" :disabled="form.processing" class="bg-tertiary border-tertiary hover:bg-tertiary/90">
-                        Save Expense
+                    <PrimaryButton :loading="form.processing" :disabled="form.processing">
+                        Create Expense
                     </PrimaryButton>
                 </div>
             </form>
         </SideModal>
     </div>
 </template>
+
+<style scoped>
+.font-black { font-weight: 900; }
+</style>

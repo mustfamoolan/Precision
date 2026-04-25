@@ -1,5 +1,10 @@
 @import 'tailwindcss';
 
+html {
+    /* Set base size lower than default 16px to scale down ALL Tailwind rem-based values (fonts, padding, margins, sizing) */
+    font-size: 11px; /* Roughly 68% of original size. Adjust as needed (10px or 12px) */
+}
+
 @theme {
     /* Fonts from design */
     --font-headline: 'Manrope', 'Instrument Sans', sans-serif;

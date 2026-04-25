@@ -13,6 +13,11 @@ class SaleController extends Controller
     {
         $query = Sale::query();
 
+        // Type filtering (default to local if not specified, but for 'Sales' page we want local)
+        // If on 'EXP INV' page, we'll pass type=export
+        $type = $request->get('type', 'local');
+        $query->where('type', $type);
+
         // Filtering Logic
         if ($request->filled(['start_date', 'end_date'])) {
             $query->whereBetween('date', [$request->start_date, $request->end_date]);
@@ -26,23 +31,29 @@ class SaleController extends Controller
         if ($request->filled('search')) {
             $query->where(function($q) use ($request) {
                 $q->where('customer_name', 'like', '%' . $request->search . '%')
-                  ->orWhere('invoice_number', 'like', '%' . $request->search . '%');
+                  ->orWhere('invoice_number', 'like', '%' . $request->search . '%')
+                  ->orWhere('container_number', 'like', '%' . $request->search . '%');
             });
         }
 
         $sales = $query->latest('date')->get();
         
-        // Summary Data
-        $totalSales = $query->sum('amount');
-        $thisMonthSales = Sale::whereMonth('date', Carbon::now()->month)
-                             ->whereYear('date', Carbon::now()->year)
-                             ->sum('amount');
+        // Summary Data for the current view
+        $totalAmount = $query->sum('amount');
+        $totalPaid = $query->sum('paid_amount');
+        $totalPending = $query->whereIn('status', ['pending', 'partial'])->sum('due_amount');
+        $totalOverdue = $query->where('status', 'overdue')->sum('due_amount'); // Assuming status logic handles this
 
-        return Inertia::render('Sales', [
+        return Inertia::render($type === 'export' ? 'ExpInv' : 'Sales', [
             'sales' => $sales,
-            'total_sales_period' => $totalSales,
-            'total_sales_month' => $thisMonthSales,
-            'filters' => $request->all(['filter', 'search', 'start_date', 'end_date']),
+            'summary' => [
+                'total_amount' => $totalAmount,
+                'total_paid' => $totalPaid,
+                'total_pending' => $totalPending,
+                'total_overdue' => $totalOverdue,
+                'total_count' => $sales->count(),
+            ],
+            'filters' => $request->all(['filter', 'search', 'start_date', 'end_date', 'type']),
         ]);
     }
 
@@ -53,7 +64,23 @@ class SaleController extends Controller
             'invoice_number' => 'required|string',
             'customer_name' => 'required|string',
             'amount' => 'required|numeric',
+            'type' => 'required|string|in:local,export',
+            'items_count' => 'nullable|integer',
+            'paid_amount' => 'nullable|numeric',
+            'container_number' => 'nullable|string',
+            'shipping_status' => 'nullable|string',
         ]);
+
+        $validated['paid_amount'] = $validated['paid_amount'] ?? 0;
+        $validated['due_amount'] = $validated['amount'] - $validated['paid_amount'];
+        
+        if ($validated['due_amount'] <= 0) {
+            $validated['status'] = 'paid';
+        } elseif ($validated['paid_amount'] > 0) {
+            $validated['status'] = 'partial';
+        } else {
+            $validated['status'] = 'pending';
+        }
 
         Sale::create($validated);
 

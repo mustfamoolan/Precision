@@ -26,9 +26,11 @@ const form = useForm({
     invoice_number: '',
     customer_name: '',
     amount: '',
-    type: 'local',
+    type: 'export',
     items_count: 1,
     paid_amount: '',
+    container_number: '',
+    shipping_status: 'On Board',
 });
 
 const submit = () => {
@@ -43,7 +45,7 @@ const submit = () => {
 const handleSearch = () => {
     router.get('/sales', { 
         search: search.value,
-        type: 'local',
+        type: 'export',
         filter: props.filters.filter
     }, { preserveState: true, preserveScroll: true });
 };
@@ -56,26 +58,32 @@ const getStatusVariant = (status) => {
     switch (status) {
         case 'paid': return 'success';
         case 'partial': return 'warning';
-        case 'overdue': return 'error';
-        case 'pending': return 'neutral';
+        case 'unpaid': return 'error';
         default: return 'neutral';
     }
 };
 
-const getInitials = (name) => {
-    return name?.split(' ').map(n => n[0]).join('').toUpperCase().substr(0, 2) || '??';
+const getShippingVariant = (status) => {
+    switch (status) {
+        case 'Delivered': return 'success';
+        case 'In Transit': return 'orange';
+        case 'On Board': return 'info';
+        default: return 'neutral';
+    }
 };
+
+const shippingStatuses = ['On Board', 'In Transit', 'Delivered'];
 </script>
 
 <template>
-    <Head title="Sales" />
+    <Head title="Export Invoices" />
 
     <div class="space-y-6 animate-in fade-in duration-500">
-        <!-- Breadcrumbs / Page Header -->
+        <!-- Page Header -->
         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
-                <h1 class="text-2xl font-headline font-bold text-on-surface tracking-tight">Sales</h1>
-                <p class="text-sm text-outline font-label">Manage your sales invoices and customers</p>
+                <h1 class="text-2xl font-headline font-bold text-on-surface tracking-tight">EXP INV</h1>
+                <p class="text-sm text-outline font-label">Manage export invoices (Container sales)</p>
             </div>
             <div class="flex items-center gap-3">
                 <button class="bg-surface-container-low border border-outline-variant/30 px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-surface-container-high transition-colors">
@@ -92,55 +100,55 @@ const getInitials = (name) => {
         <!-- KPI Cards -->
         <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
             <div class="bg-surface-container-lowest border border-outline-variant/20 p-5 rounded-2xl shadow-sm">
-                <div class="p-3 bg-primary/10 rounded-xl w-fit mb-4">
-                    <span class="material-symbols-outlined text-primary">receipt</span>
+                <div class="p-3 bg-purple-500/10 rounded-xl w-fit mb-4">
+                    <span class="material-symbols-outlined text-purple-500">public</span>
                 </div>
                 <div class="space-y-1">
-                    <p class="text-[10px] font-bold text-outline uppercase tracking-widest">Total Sales</p>
+                    <p class="text-[10px] font-bold text-outline uppercase tracking-widest">Total Export Sales</p>
                     <h3 class="text-xl font-headline font-black text-on-surface">{{ formatCurrency(summary.total_amount) }}</h3>
                     <p class="text-[10px] text-emerald-500 font-bold flex items-center gap-1">
                         <span class="material-symbols-outlined text-[12px]">trending_up</span>
-                        16.5% from last week
+                        18.6% from last month
                     </p>
                 </div>
             </div>
 
             <div class="bg-surface-container-lowest border border-outline-variant/20 p-5 rounded-2xl shadow-sm">
                 <div class="p-3 bg-emerald-500/10 rounded-xl w-fit mb-4">
-                    <span class="material-symbols-outlined text-emerald-500">check_circle</span>
+                    <span class="material-symbols-outlined text-emerald-500">account_balance</span>
                 </div>
                 <div class="space-y-1">
-                    <p class="text-[10px] font-bold text-outline uppercase tracking-widest">Paid</p>
+                    <p class="text-[10px] font-bold text-outline uppercase tracking-widest">Paid Amount</p>
                     <h3 class="text-xl font-headline font-black text-on-surface">{{ formatCurrency(summary.total_paid) }}</h3>
-                    <p class="text-[10px] text-emerald-500 font-bold flex items-center gap-1">21.7% from last week</p>
+                    <p class="text-[10px] text-outline font-bold">63.8% of total</p>
                 </div>
             </div>
 
             <div class="bg-surface-container-lowest border border-outline-variant/20 p-5 rounded-2xl shadow-sm">
                 <div class="p-3 bg-orange-500/10 rounded-xl w-fit mb-4">
-                    <span class="material-symbols-outlined text-orange-500">pending</span>
+                    <span class="material-symbols-outlined text-orange-500">schedule</span>
                 </div>
                 <div class="space-y-1">
-                    <p class="text-[10px] font-bold text-outline uppercase tracking-widest">Pending</p>
+                    <p class="text-[10px] font-bold text-outline uppercase tracking-widest">Pending Amount</p>
                     <h3 class="text-xl font-headline font-black text-on-surface">{{ formatCurrency(summary.total_pending) }}</h3>
-                    <p class="text-[10px] text-outline font-bold">13 Invoices</p>
+                    <p class="text-[10px] text-outline font-bold">29.6% of total</p>
                 </div>
             </div>
 
             <div class="bg-surface-container-lowest border border-outline-variant/20 p-5 rounded-2xl shadow-sm">
                 <div class="p-3 bg-error/10 rounded-xl w-fit mb-4">
-                    <span class="material-symbols-outlined text-error">priority_high</span>
+                    <span class="material-symbols-outlined text-error">warning</span>
                 </div>
                 <div class="space-y-1">
-                    <p class="text-[10px] font-bold text-outline uppercase tracking-widest">Overdue</p>
+                    <p class="text-[10px] font-bold text-outline uppercase tracking-widest">Overdue Amount</p>
                     <h3 class="text-xl font-headline font-black text-on-surface">{{ formatCurrency(summary.total_overdue) }}</h3>
-                    <p class="text-[10px] text-outline font-bold">5 Invoices</p>
+                    <p class="text-[10px] text-outline font-bold">6.6% of total</p>
                 </div>
             </div>
 
             <div class="bg-surface-container-lowest border border-outline-variant/20 p-5 rounded-2xl shadow-sm">
-                <div class="p-3 bg-purple-500/10 rounded-xl w-fit mb-4">
-                    <span class="material-symbols-outlined text-purple-500">description</span>
+                <div class="p-3 bg-primary/10 rounded-xl w-fit mb-4">
+                    <span class="material-symbols-outlined text-primary">description</span>
                 </div>
                 <div class="space-y-1">
                     <p class="text-[10px] font-bold text-outline uppercase tracking-widest">Total Invoices</p>
@@ -152,11 +160,11 @@ const getInitials = (name) => {
 
         <!-- Table Section -->
         <div class="bg-surface-container-lowest border border-outline-variant/20 rounded-2xl shadow-sm overflow-hidden">
-            <!-- Toolbar -->
             <div class="p-4 border-b border-outline-variant/20 flex flex-col md:flex-row justify-between items-center gap-4">
                 <div class="flex items-center gap-2">
-                    <SelectInput :options="[{label: 'This Month', value: 'month'}]" class="!w-32 !py-1.5" />
+                    <SelectInput :options="[{label: 'Apr 1, 2024 - Apr 28, 2024', value: 'range'}]" class="!w-56 !py-1.5" />
                     <SelectInput :options="[{label: 'All Customers', value: 'all'}]" class="!w-40 !py-1.5" />
+                    <SelectInput :options="[{label: 'All Status', value: 'all'}]" class="!w-32 !py-1.5" />
                 </div>
                 
                 <div class="flex flex-1 max-w-md relative">
@@ -165,37 +173,31 @@ const getInitials = (name) => {
                         v-model="search"
                         @keyup.enter="handleSearch"
                         type="text" 
-                        placeholder="Search invoice, customer..." 
+                        placeholder="Search invoice, customer, container..." 
                         class="w-full pl-10 pr-4 py-2 bg-surface-container-low rounded-xl border border-outline-variant/20 focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm font-label transition-all"
                     />
                 </div>
 
                 <div class="flex items-center gap-2">
-                    <button class="p-2 border border-outline-variant/20 rounded-lg hover:bg-surface-container-high transition-colors flex items-center gap-2 text-sm font-bold">
-                        <span class="material-symbols-outlined text-[18px]">tune</span>
-                        Filters
-                    </button>
                     <PrimaryButton @click="showAddModal = true" class="flex items-center gap-2 !py-2">
                         <span class="material-symbols-outlined text-[18px]">add</span>
-                        Add Invoice
+                        Add EXP Invoice
                     </PrimaryButton>
-                    <button class="p-2 border border-outline-variant/20 rounded-lg hover:bg-surface-container-high transition-colors flex items-center gap-2 text-sm font-bold">
+                    <button class="p-2 border border-outline-variant/20 rounded-lg hover:bg-surface-container-high transition-colors">
                         <span class="material-symbols-outlined text-[18px]">ios_share</span>
-                        Export
                     </button>
                 </div>
             </div>
 
-            <!-- Table Content -->
             <div class="overflow-x-auto">
                 <table class="w-full text-left border-collapse">
                     <thead>
                         <tr class="bg-surface-container-low/50 text-[11px] font-bold text-outline uppercase tracking-wider">
-                            <th class="px-6 py-4">Date <span class="material-symbols-outlined text-[14px] align-middle">unfold_more</span></th>
                             <th class="px-6 py-4">Invoice #</th>
+                            <th class="px-6 py-4">Invoice Date</th>
                             <th class="px-6 py-4">Customer</th>
-                            <th class="px-6 py-4">Items</th>
-                            <th class="px-6 py-4">Amount (AED)</th>
+                            <th class="px-6 py-4">Container / Shipment</th>
+                            <th class="px-6 py-4">Total Amount (AED)</th>
                             <th class="px-6 py-4">Paid (AED)</th>
                             <th class="px-6 py-4">Due (AED)</th>
                             <th class="px-6 py-4">Status</th>
@@ -204,10 +206,15 @@ const getInitials = (name) => {
                     </thead>
                     <tbody class="divide-y divide-outline-variant/10">
                         <tr v-for="sale in sales" :key="sale.id" class="hover:bg-surface-container-low/30 transition-colors group">
-                            <td class="px-6 py-4 text-xs font-bold text-on-surface-variant">{{ sale.date }}</td>
                             <td class="px-6 py-4 text-xs font-bold text-on-surface">{{ sale.invoice_number }}</td>
+                            <td class="px-6 py-4 text-xs text-on-surface-variant">{{ sale.date }}</td>
                             <td class="px-6 py-4 text-xs font-bold text-on-surface">{{ sale.customer_name }}</td>
-                            <td class="px-6 py-4 text-xs text-on-surface-variant">{{ sale.items_count }}</td>
+                            <td class="px-6 py-4">
+                                <div class="flex items-center gap-2 text-xs font-bold text-primary">
+                                    <span class="material-symbols-outlined text-[16px]">directions_boat</span>
+                                    {{ sale.container_number }}
+                                </div>
+                            </td>
                             <td class="px-6 py-4 text-xs font-black text-on-surface">{{ formatCurrency(sale.amount).replace('AED', '') }}</td>
                             <td class="px-6 py-4 text-xs font-bold text-on-surface">{{ formatCurrency(sale.paid_amount).replace('AED', '') }}</td>
                             <td class="px-6 py-4 text-xs font-bold text-on-surface">{{ formatCurrency(sale.due_amount).replace('AED', '') }}</td>
@@ -225,95 +232,79 @@ const getInitials = (name) => {
                     </tbody>
                 </table>
             </div>
-
-            <!-- Pagination -->
-            <div class="p-4 bg-surface-container-low/30 flex justify-between items-center border-t border-outline-variant/20">
-                <p class="text-[10px] font-bold text-outline uppercase tracking-widest">Showing 1 to {{ sales.length }} of {{ sales.length }} invoices</p>
-                <div class="flex items-center gap-2">
-                    <button class="p-1 border border-outline-variant/30 rounded-md disabled:opacity-30" disabled><span class="material-symbols-outlined text-[18px]">chevron_left</span></button>
-                    <button class="px-3 py-1 bg-primary text-on-primary text-xs font-bold rounded-md">1</button>
-                    <button class="px-3 py-1 text-xs font-bold text-on-surface hover:bg-surface-container-high rounded-md">2</button>
-                    <button class="p-1 border border-outline-variant/30 rounded-md"><span class="material-symbols-outlined text-[18px]">chevron_right</span></button>
-                </div>
-            </div>
         </div>
 
         <!-- Charts Row -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div class="bg-surface-container-lowest border border-outline-variant/20 p-6 rounded-2xl shadow-sm">
-                <div class="flex justify-between items-center mb-6">
-                    <h3 class="text-sm font-headline font-bold text-on-surface">Recent Payments</h3>
-                    <button class="text-[10px] font-bold text-primary uppercase hover:underline">View All</button>
-                </div>
-                <div class="space-y-4">
-                    <div v-for="sale in sales.slice(0, 3)" :key="sale.id" class="flex items-center gap-4">
-                        <div class="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-500 shrink-0">
-                            <span class="material-symbols-outlined">payments</span>
-                        </div>
-                        <div class="flex-1 min-w-0">
-                            <p class="text-xs font-bold text-on-surface truncate">Payment from {{ sale.customer_name }}</p>
-                            <p class="text-[10px] text-outline">Invoice {{ sale.invoice_number }}</p>
-                        </div>
-                        <div class="text-right">
-                            <p class="text-xs font-black text-on-surface">{{ formatCurrency(sale.paid_amount) }}</p>
-                            <p class="text-[10px] text-outline">{{ sale.date }}</p>
+                <h3 class="text-sm font-headline font-bold text-on-surface mb-6">Export Sales by Status</h3>
+                <div class="flex items-center justify-center py-4">
+                    <div class="w-40 h-40 rounded-full border-[12px] border-emerald-500 relative flex items-center justify-center">
+                        <div class="text-center">
+                            <p class="text-[10px] font-bold text-outline uppercase">AED</p>
+                            <p class="text-xl font-headline font-black text-on-surface">{{ summary.total_amount }}</p>
+                            <p class="text-[10px] font-bold text-outline">Total</p>
                         </div>
                     </div>
                 </div>
             </div>
 
             <div class="bg-surface-container-lowest border border-outline-variant/20 p-6 rounded-2xl shadow-sm">
-                <h3 class="text-sm font-headline font-bold text-on-surface mb-6">Sales by Payment Status</h3>
-                <div class="flex items-center gap-8">
-                    <div class="w-40 h-40 rounded-full border-[12px] border-emerald-500 relative flex items-center justify-center shrink-0">
-                        <div class="text-center">
-                            <p class="text-[10px] font-bold text-outline uppercase">AED</p>
-                            <p class="text-xl font-headline font-black text-on-surface">41,800</p>
-                            <p class="text-[10px] font-bold text-outline">Total</p>
+                <h3 class="text-sm font-headline font-bold text-on-surface mb-6">Top Customers (By Amount)</h3>
+                <div class="space-y-4">
+                    <div v-for="sale in sales.slice(0, 4)" :key="sale.id" class="space-y-1">
+                        <div class="flex justify-between text-xs font-bold">
+                            <span class="text-on-surface">{{ sale.customer_name }}</span>
+                            <span class="text-on-surface">{{ formatCurrency(sale.amount) }}</span>
+                        </div>
+                        <div class="w-full bg-surface-container-high rounded-full h-1.5 overflow-hidden">
+                            <div class="bg-primary h-full rounded-full" :style="{width: (sale.amount / summary.total_amount * 100) + '%'}"></div>
                         </div>
                     </div>
-                    <div class="flex-1 space-y-3">
-                        <div class="flex justify-between items-center text-xs">
-                            <div class="flex items-center gap-2">
-                                <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-                                <span class="text-outline font-medium">Paid</span>
-                            </div>
-                            <div class="font-bold">AED 36,200 <span class="text-outline text-[10px] ml-1">86.6%</span></div>
+                </div>
+            </div>
+
+            <div class="bg-surface-container-lowest border border-outline-variant/20 p-6 rounded-2xl shadow-sm">
+                <h3 class="text-sm font-headline font-bold text-on-surface mb-6">Recent Shipments</h3>
+                <div class="space-y-4">
+                    <div v-for="sale in sales.slice(0, 4)" :key="sale.id" class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-lg bg-surface-container-low flex items-center justify-center text-primary">
+                            <span class="material-symbols-outlined">directions_boat</span>
                         </div>
-                        <div class="flex justify-between items-center text-xs">
-                            <div class="flex items-center gap-2">
-                                <span class="w-2 h-2 rounded-full bg-orange-500"></span>
-                                <span class="text-outline font-medium">Partial</span>
-                            </div>
-                            <div class="font-bold">AED 5,600 <span class="text-outline text-[10px] ml-1">13.4%</span></div>
+                        <div class="flex-1 min-w-0">
+                            <p class="text-xs font-bold text-on-surface truncate">{{ sale.container_number }}</p>
+                            <p class="text-[10px] text-outline">{{ sale.date }}</p>
                         </div>
-                        <div class="flex justify-between items-center text-xs">
-                            <div class="flex items-center gap-2">
-                                <span class="w-2 h-2 rounded-full bg-error"></span>
-                                <span class="text-outline font-medium">Overdue</span>
-                            </div>
-                            <div class="font-bold">AED 9,200 <span class="text-outline text-[10px] ml-1">22.0%</span></div>
-                        </div>
+                        <Badge :variant="getShippingVariant(sale.shipping_status)">{{ sale.shipping_status || 'On Board' }}</Badge>
                     </div>
                 </div>
             </div>
         </div>
 
         <!-- Add Modal -->
-        <SideModal :show="showAddModal" title="Add New Invoice" @close="showAddModal = false">
+        <SideModal :show="showAddModal" title="Add Export Invoice" @close="showAddModal = false">
             <form @submit.prevent="submit" class="space-y-5 p-2">
                 <div class="grid grid-cols-2 gap-4">
                     <FormField label="Date" :error="form.errors.date" required>
                         <TextInput v-model="form.date" type="date" />
                     </FormField>
                     <FormField label="Invoice #" :error="form.errors.invoice_number" required>
-                        <TextInput v-model="form.invoice_number" placeholder="INV-1000" />
+                        <TextInput v-model="form.invoice_number" placeholder="EXP-1000" />
                     </FormField>
                 </div>
 
                 <FormField label="Customer Name" :error="form.errors.customer_name" required>
                     <TextInput v-model="form.customer_name" placeholder="Client Name" />
                 </FormField>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <FormField label="Container / Shipment #" :error="form.errors.container_number" required>
+                        <TextInput v-model="form.container_number" placeholder="CN-123456" />
+                    </FormField>
+                    <FormField label="Shipping Status" :error="form.errors.shipping_status" required>
+                        <SelectInput v-model="form.shipping_status" :options="shippingStatuses.map(s => ({label: s, value: s}))" />
+                    </FormField>
+                </div>
 
                 <div class="grid grid-cols-2 gap-4">
                     <FormField label="Total Amount (AED)" :error="form.errors.amount" required>
@@ -324,14 +315,10 @@ const getInitials = (name) => {
                     </FormField>
                 </div>
 
-                <FormField label="Number of Items" :error="form.errors.items_count">
-                    <TextInput v-model="form.items_count" type="number" />
-                </FormField>
-
                 <div class="pt-6 flex justify-end gap-3 border-t border-outline-variant/10 mt-6">
                     <SecondaryButton @click="showAddModal = false" type="button">Cancel</SecondaryButton>
                     <PrimaryButton :loading="form.processing" :disabled="form.processing">
-                        Create Invoice
+                        Create EXP Invoice
                     </PrimaryButton>
                 </div>
             </form>

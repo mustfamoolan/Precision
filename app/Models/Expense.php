@@ -10,7 +10,18 @@ class Expense extends Model
     /** @use HasFactory<\Database\Factories\ExpenseFactory> */
     use HasFactory;
 
-    protected $fillable = ['date', 'employee_id', 'description', 'amount', 'bank_id'];
+    protected $fillable = [
+        'date', 
+        'employee_id', 
+        'description', 
+        'amount', 
+        'bank_id',
+        'expense_number',
+        'category',
+        'supplier_person',
+        'payment_method',
+        'status'
+    ];
 
     public function employee()
     {

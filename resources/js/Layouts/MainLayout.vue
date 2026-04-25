@@ -87,6 +87,7 @@ onUnmounted(() => {
 const navItems = [
     { name: 'Dashboard', icon: 'dashboard', href: '/dashboard' },
     { name: 'Sales', icon: 'payments', href: '/sales' },
+    { name: 'EXP INV', icon: 'export_notes', href: '/sales?type=export' },
     { name: 'Expenses', icon: 'receipt_long', href: '/expenses' },
     { name: 'Employees', icon: 'badge', href: '/employees' },
     { name: 'Inventory', icon: 'inventory_2', href: '/inventory' },
