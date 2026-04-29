@@ -10,19 +10,33 @@ class Inventory extends Model
 
     protected $fillable = [
         'name',
+        'category',
         'sku',
+        'cost_price',
         'selling_price',
         'shop_quantity',
         'warehouse_quantity',
+        'remote_quantity',
+        'low_stock_threshold',
     ];
 
     /**
      * Total quantity across all locations.
      */
-    protected $appends = ['total_quantity'];
+    protected $appends = ['total_quantity', 'valuation'];
 
     public function getTotalQuantityAttribute()
     {
-        return $this->shop_quantity + $this->warehouse_quantity;
+        return $this->shop_quantity + $this->warehouse_quantity + $this->remote_quantity;
+    }
+
+    public function getValuationAttribute()
+    {
+        return $this->total_quantity * ($this->cost_price ?? 0);
+    }
+
+    public function movements()
+    {
+        return $this->hasMany(StockMovement::class);
     }
 }

@@ -22,11 +22,17 @@ class Sale extends Model
         'status', 
         'container_number', 
         'shipping_status',
-        'bank_id'
+        'bank_id',
+        'shipment_id'
     ];
 
     public function bank()
     {
         return $this->belongsTo(Bank::class);
+    }
+
+    public function shipment()
+    {
+        return $this->belongsTo(Shipment::class);
     }
 }

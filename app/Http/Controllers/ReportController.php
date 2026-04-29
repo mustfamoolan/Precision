@@ -30,12 +30,35 @@ class ReportController extends Controller
 
         // Summary Calculations
         $totalSales = Sale::whereBetween('date', [$startDate, $endDate])->sum('amount');
-        $salesCount = Sale::whereBetween('date', [$startDate, $endDate])->count();
-        
         $totalExpenses = Expense::whereBetween('date', [$startDate, $endDate])->sum('amount');
-        $expensesCount = Expense::whereBetween('date', [$startDate, $endDate])->count();
         
-        $netProfit = $totalSales - $totalExpenses;
+        // --- CASH FLOW (Monthly Breakdown for last 6 months) ---
+        $cashFlow = [];
+        for ($i = 5; $i >= 0; $i--) {
+            $mStart = Carbon::now()->subMonths($i)->startOfMonth();
+            $mEnd = Carbon::now()->subMonths($i)->endOfMonth();
+            $monthName = $mStart->format('M');
+            
+            $in = Sale::whereBetween('date', [$mStart, $mEnd])->sum('paid_amount');
+            $out = Expense::whereBetween('date', [$mStart, $mEnd])->sum('amount');
+            
+            $cashFlow[] = [
+                'month' => $monthName,
+                'inflow' => (float)$in,
+                'outflow' => (float)$out,
+                'net' => (float)($in - $out)
+            ];
+        }
+
+        // --- DEBT AGING SUMMARY ---
+        $today = Carbon::today();
+        $aging = [
+            'total_receivable' => Sale::sum('due_amount'),
+            'current' => Sale::where('date', '>=', $today->copy()->subDays(30))->sum('due_amount'),
+            '30_60_days' => Sale::whereBetween('date', [$today->copy()->subDays(60), $today->copy()->subDays(31)])->sum('due_amount'),
+            '60_90_days' => Sale::whereBetween('date', [$today->copy()->subDays(90), $today->copy()->subDays(61)])->sum('due_amount'),
+            'over_90_days' => Sale::where('date', '<', $today->copy()->subDays(90))->sum('due_amount'),
+        ];
 
         // Top Expense Categories
         $topExpenses = Expense::whereBetween('date', [$startDate, $endDate])
@@ -47,7 +70,7 @@ class ReportController extends Controller
 
         // Full Ledger Data
         $salesFeed = Sale::whereBetween('date', [$startDate, $endDate])
-            ->select('date', 'customer_name as name', 'amount', DB::raw("'sale' as type"))
+            ->select('date', 'customer_name as name', 'amount', 'paid_amount', 'due_amount', DB::raw("'sale' as type"))
             ->get();
             
         $expensesFeed = Expense::with('employee')->whereBetween('date', [$startDate, $endDate])
@@ -55,6 +78,8 @@ class ReportController extends Controller
             ->get()
             ->map(function($e) {
                 $e->name = $e->name . " (" . ($e->employee->name ?? 'System') . ")";
+                $e->paid_amount = $e->amount;
+                $e->due_amount = 0;
                 return $e;
             });
 
@@ -63,14 +88,14 @@ class ReportController extends Controller
         return Inertia::render('Reports', [
             'summary' => [
                 'total_sales' => $totalSales,
-                'sales_count' => $salesCount,
                 'total_expenses' => $totalExpenses,
-                'expenses_count' => $expensesCount,
-                'net_profit' => $netProfit,
+                'net_profit' => $totalSales - $totalExpenses,
                 'start_date' => $startDate->format('Y-m-d'),
                 'end_date' => $endDate->format('Y-m-d'),
                 'period_label' => $startDate->format('M d') . ' - ' . $endDate->format('M d, Y'),
             ],
+            'cash_flow' => $cashFlow,
+            'aging' => $aging,
             'top_expenses' => $topExpenses,
             'ledger' => $ledger,
             'filters' => $request->all(['filter', 'start_date', 'end_date']),

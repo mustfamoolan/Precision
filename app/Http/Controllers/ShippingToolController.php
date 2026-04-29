@@ -2,77 +2,106 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Shipment;
+use App\Models\Sale;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
 
 class ShippingToolController extends Controller
 {
     /**
-     * Goal: Accept inputs and return calculated shipping costs.
+     * Display a listing of shipments.
      */
-    public function calculate(Request $request)
+    public function index(Request $request)
     {
-        $validated = $request->validate([
-            'weight' => 'required|numeric|min:0',
-            'rate_per_kg' => 'required|numeric|min:0',
-            'fixed_charge' => 'nullable|numeric|min:0',
-            'discount' => 'nullable|numeric|min:0',
-        ]);
+        $query = Shipment::withCount('sales');
 
-        $weight = $validated['weight'];
-        $rate = $validated['rate_per_kg'];
-        $fixed = $validated['fixed_charge'] ?? 0;
-        $discount = $validated['discount'] ?? 0;
+        if ($request->filled('search')) {
+            $query->where('container_number', 'like', '%' . $request->search . '%')
+                  ->orWhere('vessel_name', 'like', '%' . $request->search . '%');
+        }
 
-        $total = ($weight * $rate) + $fixed - $discount;
+        $shipments = $query->latest()->get();
 
-        return response()->json([
-            'inputs' => $validated,
-            'calculation' => [
-                'subtotal' => $weight * $rate,
-                'fixed_charge' => $fixed,
-                'discount' => $discount,
-                'total' => max(0, $total),
-            ]
+        // Summary stats
+        $summary = [
+            'total_shipments' => $shipments->count(),
+            'active_shipments' => $shipments->whereNotIn('status', ['Completed', 'Delivered'])->count(),
+            'total_shipping_costs' => $shipments->sum('shipping_cost'),
+            'total_tax_clearance' => $shipments->sum('import_tax') + $shipments->sum('clearance_fees'),
+        ];
+
+        return Inertia::render('Shipping', [
+            'shipments' => $shipments,
+            'summary' => $summary,
+            'filters' => $request->all(['search'])
         ]);
     }
 
     /**
-     * Display a listing of the resource.
-     */
-    public function index()
-    {
-        //
-    }
-
-    /**
-     * Store a newly created resource in storage.
+     * Store a newly created shipment.
      */
     public function store(Request $request)
     {
-        //
+        $validated = $request->validate([
+            'container_number' => 'required|string|unique:shipments',
+            'vessel_name' => 'nullable|string',
+            'origin' => 'nullable|string',
+            'destination' => 'nullable|string',
+            'departure_date' => 'nullable|date',
+            'arrival_date' => 'nullable|date',
+            'status' => 'required|string|in:On Board,In Transit,Delivered,Completed',
+            'shipping_cost' => 'nullable|numeric|min:0',
+            'import_tax' => 'nullable|numeric|min:0',
+            'clearance_fees' => 'nullable|numeric|min:0',
+            'other_costs' => 'nullable|numeric|min:0',
+            'notes' => 'nullable|string',
+        ]);
+
+        $shipment = Shipment::create($validated);
+
+        // Automatically link existing sales with this container number
+        Sale::where('container_number', $shipment->container_number)
+            ->update(['shipment_id' => $shipment->id]);
+
+        return redirect()->back()->with('success', 'Shipment created successfully.');
     }
 
     /**
-     * Display the specified resource.
+     * Update the specified shipment.
      */
-    public function show(string $id)
+    public function update(Request $request, Shipment $shipment)
     {
-        //
+        $validated = $request->validate([
+            'container_number' => 'required|string|unique:shipments,container_number,' . $shipment->id,
+            'vessel_name' => 'nullable|string',
+            'origin' => 'nullable|string',
+            'destination' => 'nullable|string',
+            'departure_date' => 'nullable|date',
+            'arrival_date' => 'nullable|date',
+            'status' => 'required|string|in:On Board,In Transit,Delivered,Completed',
+            'shipping_cost' => 'nullable|numeric|min:0',
+            'import_tax' => 'nullable|numeric|min:0',
+            'clearance_fees' => 'nullable|numeric|min:0',
+            'other_costs' => 'nullable|numeric|min:0',
+            'notes' => 'nullable|string',
+        ]);
+
+        $shipment->update($validated);
+
+        // Update link for sales if container number changed
+        Sale::where('container_number', $shipment->container_number)
+            ->update(['shipment_id' => $shipment->id]);
+
+        return redirect()->back()->with('success', 'Shipment updated successfully.');
     }
 
     /**
-     * Update the specified resource in storage.
+     * Remove the specified shipment.
      */
-    public function update(Request $request, string $id)
+    public function destroy(Shipment $shipment)
     {
-        //
-    }
-
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
-    {
-        //
+        $shipment->delete();
+        return redirect()->back()->with('success', 'Shipment deleted.');
     }
 }
