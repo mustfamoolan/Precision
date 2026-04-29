@@ -16,6 +16,7 @@ const props = defineProps({
     sales: Array,
     summary: Object,
     filters: Object,
+    banks: Array,
 });
 
 const showAddModal = ref(false);
@@ -29,6 +30,7 @@ const form = useForm({
     type: 'local',
     items_count: 1,
     paid_amount: '',
+    bank_id: '',
 });
 
 const submit = () => {
@@ -319,9 +321,18 @@ const getInitials = (name) => {
                     <FormField label="Total Amount (AED)" :error="form.errors.amount" required>
                         <TextInput v-model="form.amount" type="number" step="0.01" prefix="AED" placeholder="0.00" />
                     </FormField>
+                <div class="grid grid-cols-2 gap-4">
                     <FormField label="Paid Amount (AED)" :error="form.errors.paid_amount">
                         <TextInput v-model="form.paid_amount" type="number" step="0.01" prefix="AED" placeholder="0.00" />
                     </FormField>
+                    <FormField label="Bank/Account" :error="form.errors.bank_id">
+                        <SelectInput 
+                            v-model="form.bank_id" 
+                            :options="banks.map(b => ({ label: b.name, value: b.id }))" 
+                            placeholder="Select Bank"
+                        />
+                    </FormField>
+                </div>
                 </div>
 
                 <FormField label="Number of Items" :error="form.errors.items_count">

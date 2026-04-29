@@ -21,6 +21,12 @@ class Sale extends Model
         'due_amount', 
         'status', 
         'container_number', 
-        'shipping_status'
+        'shipping_status',
+        'bank_id'
     ];
+
+    public function bank()
+    {
+        return $this->belongsTo(Bank::class);
+    }
 }

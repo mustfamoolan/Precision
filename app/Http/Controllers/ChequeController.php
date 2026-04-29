@@ -52,14 +52,24 @@ class ChequeController extends Controller
 
         return DB::transaction(function () use ($validated, $cheque) {
             $cheque->update([
-                'status' => 'received',
+                'status' => 'collected',
                 'bank_id' => $validated['bank_id']
             ]);
 
             $bank = Bank::lockForUpdate()->find($validated['bank_id']);
             $bank->increment('balance', $cheque->amount);
 
-            return redirect()->back()->with('success', 'Cheque cleared into ' . $bank->name);
+            \App\Models\BankTransaction::create([
+                'bank_id' => $validated['bank_id'],
+                'amount' => $cheque->amount,
+                'type' => 'deposit',
+                'reference_type' => 'Cheque',
+                'reference_id' => $cheque->id,
+                'description' => "Cheque Collection: #{$cheque->cheque_number} from {$cheque->party_name}",
+                'date' => now()->toDateString(),
+            ]);
+
+            return redirect()->back()->with('success', 'Cheque collected into ' . $bank->name);
         });
     }
 

@@ -16,6 +16,7 @@ const props = defineProps({
     sales: Array,
     summary: Object,
     filters: Object,
+    banks: Array,
 });
 
 const showAddModal = ref(false);
@@ -31,6 +32,7 @@ const form = useForm({
     paid_amount: '',
     container_number: '',
     shipping_status: 'On Board',
+    bank_id: '',
 });
 
 const submit = () => {
@@ -310,9 +312,18 @@ const shippingStatuses = ['On Board', 'In Transit', 'Delivered'];
                     <FormField label="Total Amount (AED)" :error="form.errors.amount" required>
                         <TextInput v-model="form.amount" type="number" step="0.01" prefix="AED" placeholder="0.00" />
                     </FormField>
+                <div class="grid grid-cols-2 gap-4">
                     <FormField label="Paid Amount (AED)" :error="form.errors.paid_amount">
                         <TextInput v-model="form.paid_amount" type="number" step="0.01" prefix="AED" placeholder="0.00" />
                     </FormField>
+                    <FormField label="Bank/Account" :error="form.errors.bank_id">
+                        <SelectInput 
+                            v-model="form.bank_id" 
+                            :options="banks.map(b => ({ label: b.name, value: b.id }))" 
+                            placeholder="Select Bank"
+                        />
+                    </FormField>
+                </div>
                 </div>
 
                 <div class="pt-6 flex justify-end gap-3 border-t border-outline-variant/10 mt-6">

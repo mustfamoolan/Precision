@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Sale;
+use App\Models\Bank;
 use Carbon\Carbon;
 use Inertia\Inertia;
 
@@ -54,6 +55,7 @@ class SaleController extends Controller
                 'total_count' => $sales->count(),
             ],
             'filters' => $request->all(['filter', 'search', 'start_date', 'end_date', 'type']),
+            'banks' => Bank::all(['id', 'name']),
         ]);
     }
 
@@ -69,6 +71,7 @@ class SaleController extends Controller
             'paid_amount' => 'nullable|numeric',
             'container_number' => 'nullable|string',
             'shipping_status' => 'nullable|string',
+            'bank_id' => 'nullable|exists:banks,id',
         ]);
 
         $validated['paid_amount'] = $validated['paid_amount'] ?? 0;
