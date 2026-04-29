@@ -6,6 +6,8 @@ use Illuminate\Http\Request;
 use App\Models\Sale;
 use App\Models\Expense;
 use App\Models\Bank;
+use App\Models\Shipment;
+use App\Models\Cheque;
 use Carbon\Carbon;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\DB;
@@ -15,6 +17,7 @@ class DashboardController extends Controller
     public function index()
     {
         $now = Carbon::now();
+        $today = Carbon::today();
         
         // Revenue (Sales) this month
         $monthlySales = Sale::whereMonth('date', $now->month)
@@ -33,6 +36,12 @@ class DashboardController extends Controller
         $banks = Bank::all(['id', 'name', 'balance']);
         $totalBankCash = $banks->sum('balance');
         
+        // --- NEW KPIs ---
+        $activeShipments = Shipment::whereNotIn('status', ['Completed', 'Delivered'])->count();
+        $upcomingCheques = Cheque::where('status', 'pending')
+            ->whereBetween('due_date', [$today, $today->copy()->addDays(5)])
+            ->count();
+            
         // Latest 5 Sales
         $recentSales = Sale::latest('date')
             ->limit(5)
@@ -79,6 +88,8 @@ class DashboardController extends Controller
                 'net_profit' => $netProfit,
                 'total_bank_cash' => $totalBankCash,
                 'sales_growth' => round($salesGrowth, 1),
+                'active_shipments' => $activeShipments,
+                'upcoming_cheques' => $upcomingCheques,
             ],
             'chart_data' => [
                 'daily_sales' => $dailySales,

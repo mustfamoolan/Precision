@@ -1,7 +1,8 @@
 <script setup>
+import { ref, computed } from 'vue';
 import MainLayout from '@/Layouts/MainLayout.vue';
 import { Head, Link } from '@inertiajs/vue3';
-import { computed } from 'vue';
+import Badge from '@/Components/Badge.vue';
 
 defineOptions({ layout: MainLayout });
 
@@ -13,280 +14,169 @@ const props = defineProps({
 });
 
 const formatCurrency = (value) => {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
+    return new Intl.NumberFormat('en-AE', { style: 'currency', currency: 'AED' }).format(value);
 };
 
-const getInitials = (name) => {
-    return name.split(' ').map(n => n[0]).join('').toUpperCase().substr(0, 2);
+const getStatusVariant = (status) => {
+    switch (status) {
+        case 'paid': return 'success';
+        case 'partial': return 'warning';
+        case 'unpaid': return 'error';
+        default: return 'neutral';
+    }
 };
-
-// --- Chart Logic ---
-
-// SVG Line Chart Logic
-const salesPoints = computed(() => {
-    const data = props.chart_data.daily_sales;
-    const max = Math.max(...data.map(d => d.amount), 100);
-    const height = 100;
-    const width = 400;
-    const step = width / (data.length - 1);
-    
-    return data.map((d, i) => ({
-        x: i * step,
-        y: height - (d.amount / max * height)
-    }));
-});
-
-const polylinePoints = computed(() => {
-    return salesPoints.value.map(p => `${p.x},${p.y}`).join(' ');
-});
-
-const areaPoints = computed(() => {
-    const points = salesPoints.value;
-    if (points.length === 0) return '';
-    return `${points[0].x},100 ` + points.map(p => `${p.x},${p.y}`).join(' ') + ` ${points[points.length-1].x},100`;
-});
 </script>
 
 <template>
     <Head title="Dashboard" />
 
-    <div class="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
+    <div class="space-y-6 animate-in fade-in duration-700">
         <!-- Page Header -->
-        <div class="flex items-end justify-between">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
-                <h2 class="font-headline text-3xl sm:text-4xl font-extrabold text-on-surface tracking-tight mb-2">Welcome back, Admin</h2>
-                <p class="text-on-surface-variant font-medium">Visual intelligence for your active organization.</p>
+                <h1 class="text-2xl font-headline font-bold text-on-surface tracking-tight">Precision Overview</h1>
+                <p class="text-sm text-outline font-label">Financial and Logistics Monitoring</p>
             </div>
-            <div class="hidden md:flex items-center gap-3 bg-surface-container-highest py-2 px-4 rounded-xl border border-outline-variant/20 shadow-sm">
-                <span class="material-symbols-outlined text-on-surface-variant text-[20px]">insights</span>
-                <span class="font-bold text-sm text-on-surface uppercase tracking-tight italic">Live Analytics</span>
-            </div>
-        </div>
-
-        <!-- KPI Bento Grid -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            <!-- Monthly Sales -->
-            <div class="bg-surface-container-lowest rounded-2xl p-6 shadow-sm border border-outline-variant/10 relative overflow-hidden group hover:-translate-y-1 transition-all duration-300">
-                <div class="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity">
-                    <span class="material-symbols-outlined text-[72px] text-primary">payments</span>
-                </div>
-                <div class="flex items-center gap-3 mb-4 relative z-10">
-                    <div class="w-10 h-10 rounded-full bg-primary-fixed flex items-center justify-center text-primary">
-                        <span class="material-symbols-outlined text-xl">trending_up</span>
-                    </div>
-                    <span class="font-label font-bold text-on-surface-variant text-xs uppercase tracking-widest">Monthly Sales</span>
-                </div>
-                <div class="font-headline text-3xl font-extrabold text-on-surface mb-2 relative z-10">{{ formatCurrency(stats.monthly_sales) }}</div>
-                <div class="flex items-center gap-1 text-xs relative z-10">
-                    <span class="material-symbols-outlined text-tertiary text-[16px]" v-if="stats.sales_growth >= 0">arrow_upward</span>
-                    <span class="material-symbols-outlined text-error text-[16px]" v-else>arrow_downward</span>
-                    <span :class="stats.sales_growth >= 0 ? 'text-[#14804a]' : 'text-error'" class="font-bold">{{ Math.abs(stats.sales_growth) }}%</span>
-                    <span class="text-on-surface-variant ml-1 font-medium italic">vs last month</span>
-                </div>
-            </div>
-
-            <!-- Available Cash -->
-            <div class="bg-surface-container-lowest rounded-2xl p-6 shadow-sm border border-outline-variant/10 relative overflow-hidden group hover:-translate-y-1 transition-all duration-300">
-                <div class="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity">
-                    <span class="material-symbols-outlined text-[72px] text-secondary">account_balance</span>
-                </div>
-                <div class="flex items-center gap-3 mb-4 relative z-10">
-                    <div class="w-10 h-10 rounded-full bg-secondary-fixed flex items-center justify-center text-on-secondary-fixed">
-                        <span class="material-symbols-outlined text-xl">account_balance_wallet</span>
-                    </div>
-                    <span class="font-label font-bold text-on-surface-variant text-xs uppercase tracking-widest">Available Cash</span>
-                </div>
-                <div class="font-headline text-3xl font-extrabold text-on-surface mb-2 relative z-10">{{ formatCurrency(stats.total_bank_cash) }}</div>
-                <div class="text-[10px] text-on-surface-variant font-bold uppercase tracking-tight relative z-10">Aggregate of all Bank Balances</div>
-            </div>
-
-            <!-- Monthly Expenses -->
-            <div class="bg-surface-container-lowest rounded-2xl p-6 shadow-sm border border-outline-variant/10 relative overflow-hidden group hover:-translate-y-1 transition-all duration-300">
-                <div class="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity">
-                    <span class="material-symbols-outlined text-[72px] text-tertiary">receipt_long</span>
-                </div>
-                <div class="flex items-center gap-3 mb-4 relative z-10">
-                    <div class="w-10 h-10 rounded-full bg-tertiary-fixed flex items-center justify-center text-on-tertiary-fixed">
-                        <span class="material-symbols-outlined text-xl">outbox</span>
-                    </div>
-                    <span class="font-label font-bold text-on-surface-variant text-xs uppercase tracking-widest">Monthly Expenses</span>
-                </div>
-                <div class="font-headline text-3xl font-extrabold text-on-surface mb-2 relative z-10 text-error">{{ formatCurrency(stats.monthly_expenses) }}</div>
-                <div class="text-[10px] text-on-surface-variant font-bold uppercase tracking-tight relative z-10">Tracked organizational burn</div>
-            </div>
-
-            <!-- Net Profit -->
-            <div class="bg-gradient-to-br from-primary to-primary-container rounded-2xl p-6 text-on-primary shadow-xl relative overflow-hidden group hover:-translate-y-1 transition-all duration-300">
-                <div class="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-2xl group-hover:scale-110 transition-transform duration-700"></div>
-                <div class="relative z-10 flex flex-col items-start">
-                    <div class="flex items-center gap-3 mb-4">
-                        <div class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-on-primary backdrop-blur-md">
-                            <span class="material-symbols-outlined text-xl" style="font-variation-settings: 'FILL' 1;">stars</span>
-                        </div>
-                        <span class="font-label font-bold text-on-primary-container/80 text-xs uppercase tracking-widest">Net monthly profit</span>
-                    </div>
-                    <div class="font-headline text-3xl font-extrabold mb-2">{{ formatCurrency(stats.net_profit) }}</div>
-                    <div class="text-[10px] text-on-primary-container font-bold uppercase tracking-widest flex items-center gap-1">
-                        <span class="w-1.5 h-1.5 rounded-full bg-on-primary-container"></span>
-                        Keep Building Value
-                    </div>
-                </div>
+            <div class="flex items-center gap-3">
+                <button class="bg-surface-container-low border border-outline-variant/30 px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-surface-container-high transition-colors">
+                    <span class="material-symbols-outlined text-[18px]">calendar_today</span>
+                    {{ new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) }}
+                </button>
             </div>
         </div>
 
-        <!-- Charts Row -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <!-- Weekly Trend Chart -->
-            <div class="bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/10 shadow-sm relative overflow-hidden group">
-                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-10 gap-2">
-                    <div>
-                        <h3 class="font-headline text-lg font-bold text-on-surface">Weekly Sales Trend</h3>
-                        <p class="text-xs text-outline font-body">Performance overview of the last 7 days</p>
-                    </div>
-                    <div class="px-3 py-1 bg-primary/10 rounded-full text-[10px] font-bold text-primary uppercase tracking-widest">Real-time</div>
-                </div>
-
-                <!-- Custom SVG Chart -->
-                <div class="relative h-48 w-full mt-4">
-                    <svg class="w-full h-full overflow-visible" viewBox="0 0 400 100" preserveAspectRatio="none font-['Inter']">
-                        <!-- Area Fill -->
-                        <polygon :points="areaPoints" fill="url(#salesGradient)" opacity="0.15" />
-                        <!-- Line -->
-                        <polyline :points="polylinePoints" fill="none" stroke="currentColor" stroke-width="3" class="text-primary" stroke-linecap="round" stroke-linejoin="round" />
-                        <!-- Points -->
-                        <circle v-for="(p, i) in salesPoints" :key="i" :cx="p.x" :cy="p.y" r="4" class="fill-surface-container-lowest stroke-primary stroke-[2px]" />
-                        
-                        <!-- Definitions -->
-                        <defs>
-                            <linearGradient id="salesGradient" x1="0" x2="0" y1="0" y2="1">
-                                <stop offset="0%" stop-color="currentColor" class="text-primary" />
-                                <stop offset="100%" stop-color="transparent" />
-                            </linearGradient>
-                        </defs>
-                    </svg>
-                    
-                    <!-- Labels -->
-                    <div class="flex justify-between mt-4 px-1">
-                        <span v-for="d in chart_data.daily_sales" :key="d.day" class="text-[10px] font-bold text-outline uppercase tracking-tighter">{{ d.day }}</span>
-                    </div>
+        <!-- Main Stats Row -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div class="bg-primary border border-primary-container p-5 rounded-2xl shadow-lg shadow-primary/10 text-on-primary">
+                <p class="text-[10px] font-bold opacity-80 uppercase tracking-widest mb-1">Monthly Revenue</p>
+                <h3 class="text-2xl font-headline font-black">{{ formatCurrency(stats.monthly_sales) }}</h3>
+                <div class="flex items-center gap-1 mt-2 text-[10px] font-bold">
+                    <span class="material-symbols-outlined text-[14px]">{{ stats.sales_growth >= 0 ? 'trending_up' : 'trending_down' }}</span>
+                    {{ Math.abs(stats.sales_growth) }}% from last month
                 </div>
             </div>
 
-            <!-- Expense Distribution -->
-            <div class="bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/10 shadow-sm relative group flex flex-col">
-                <div class="flex justify-between items-start mb-8">
-                    <div>
-                        <h3 class="font-headline text-lg font-bold text-on-surface">Top Expenses</h3>
-                        <p class="text-xs text-outline font-body">Highest spending categories this month</p>
-                    </div>
-                    <span class="material-symbols-outlined text-outline">pie_chart</span>
-                </div>
+            <div class="bg-surface-container-lowest border border-outline-variant/20 p-5 rounded-2xl shadow-sm">
+                <p class="text-[10px] font-bold text-outline uppercase tracking-widest mb-1">Monthly Expenses</p>
+                <h3 class="text-2xl font-headline font-black text-error">{{ formatCurrency(stats.monthly_expenses) }}</h3>
+                <p class="text-[10px] text-outline font-bold mt-2">Operating costs</p>
+            </div>
 
-                <div class="space-y-6 flex-1 flex flex-col justify-center">
-                    <div v-for="item in chart_data.expense_breakdown" :key="item.description" class="space-y-2">
-                        <div class="flex justify-between text-xs font-bold font-label">
-                            <span class="text-on-surface truncate pr-4">{{ item.description }}</span>
-                            <span class="text-error">{{ formatCurrency(item.total) }}</span>
+            <div class="bg-surface-container-lowest border border-outline-variant/20 p-5 rounded-2xl shadow-sm">
+                <p class="text-[10px] font-bold text-outline uppercase tracking-widest mb-1">Net Profit</p>
+                <h3 class="text-2xl font-headline font-black text-emerald-600">{{ formatCurrency(stats.net_profit) }}</h3>
+                <p class="text-[10px] text-outline font-bold mt-2">After tax & expenses</p>
+            </div>
+
+            <div class="bg-surface-container-lowest border border-outline-variant/20 p-5 rounded-2xl shadow-sm">
+                <p class="text-[10px] font-bold text-outline uppercase tracking-widest mb-1">Total Bank Liquidity</p>
+                <h3 class="text-2xl font-headline font-black text-on-surface">{{ formatCurrency(stats.total_bank_cash) }}</h3>
+                <p class="text-[10px] text-outline font-bold mt-2">Across all accounts</p>
+            </div>
+        </div>
+
+        <!-- Secondary Stats & Alerts Row -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <!-- Active Shipments -->
+            <div class="bg-surface-container-lowest border border-outline-variant/20 p-6 rounded-2xl shadow-sm">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-sm font-headline font-bold text-on-surface uppercase tracking-widest">Active Shippings</h3>
+                    <div class="w-10 h-10 bg-orange-500/10 rounded-xl flex items-center justify-center text-orange-500">
+                        <span class="material-symbols-outlined">directions_boat</span>
+                    </div>
+                </div>
+                <div class="flex items-center gap-4">
+                    <h2 class="text-4xl font-black text-orange-500">{{ stats.active_shipments }}</h2>
+                    <p class="text-xs text-outline font-label">Containers currently <br> in transit or on board</p>
+                </div>
+                <Link href="/shipping" class="mt-6 block text-center py-2 bg-surface-container-low rounded-lg text-xs font-bold hover:bg-surface-container-high transition-colors">
+                    View Shipping Board
+                </Link>
+            </div>
+
+            <!-- Upcoming Cheques -->
+            <div class="bg-surface-container-lowest border border-outline-variant/20 p-6 rounded-2xl shadow-sm">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-sm font-headline font-bold text-on-surface uppercase tracking-widest">Cheque Alerts</h3>
+                    <div class="w-10 h-10 bg-purple-500/10 rounded-xl flex items-center justify-center text-purple-500 relative">
+                        <span class="material-symbols-outlined">payments</span>
+                        <span v-if="stats.upcoming_cheques > 0" class="absolute -top-1 -right-1 w-3 h-3 bg-error rounded-full animate-pulse border-2 border-surface-container-lowest"></span>
+                    </div>
+                </div>
+                <div class="flex items-center gap-4">
+                    <h2 class="text-4xl font-black text-purple-500">{{ stats.upcoming_cheques }}</h2>
+                    <p class="text-xs text-outline font-label">Cheques due for collection <br> in the next 5 days</p>
+                </div>
+                <Link href="/banks" class="mt-6 block text-center py-2 bg-purple-500/5 text-purple-600 rounded-lg text-xs font-bold hover:bg-purple-500/10 transition-colors">
+                    Open Bank Manager
+                </Link>
+            </div>
+
+            <!-- Top Expense Distribution -->
+            <div class="bg-surface-container-lowest border border-outline-variant/20 p-6 rounded-2xl shadow-sm">
+                <h3 class="text-sm font-headline font-bold text-on-surface uppercase tracking-widest mb-6">Expense Breakdown</h3>
+                <div class="space-y-4">
+                    <div v-for="expense in chart_data.expense_breakdown" :key="expense.description" class="space-y-1">
+                        <div class="flex justify-between text-[10px] font-bold">
+                            <span class="text-on-surface truncate pr-2">{{ expense.description }}</span>
+                            <span class="text-outline">{{ formatCurrency(expense.total) }}</span>
                         </div>
-                        <div class="w-full h-2 bg-surface-container-high rounded-full overflow-hidden">
-                            <div 
-                                class="h-full bg-tertiary rounded-full group-hover:opacity-80 animate-bar-grow"
-                                :style="{ width: (item.total / stats.monthly_expenses * 100) + '%' }"
-                            ></div>
+                        <div class="w-full bg-surface-container-low rounded-full h-1.5">
+                            <div class="bg-primary h-full rounded-full" :style="{ width: (expense.total / stats.monthly_expenses * 100) + '%' }"></div>
                         </div>
                     </div>
-                    <div v-if="chart_data.expense_breakdown.length === 0" class="py-12 text-center text-outline italic text-sm">
-                        No expenses recorded yet for this month.
-                    </div>
+                    <div v-if="chart_data.expense_breakdown.length === 0" class="text-center py-4 text-xs text-outline">No expenses recorded this month.</div>
                 </div>
             </div>
         </div>
 
-        <!-- Dashboard Content Grid -->
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-            <!-- Left: Recent Sales -->
-            <div class="lg:col-span-8 space-y-6">
-                <div class="bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant/10 p-6 overflow-hidden">
-                    <div class="flex items-center justify-between mb-8">
-                        <h3 class="font-headline text-xl font-bold text-on-surface">Recent Activity Feed</h3>
-                        <Link href="/sales" class="text-primary font-bold text-xs uppercase tracking-widest hover:underline flex items-center gap-1">
-                            View All Records <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
-                        </Link>
-                    </div>
-                    
-                    <div class="w-full overflow-x-auto">
-                        <table class="w-full text-left border-collapse">
-                            <thead>
-                                <tr class="text-[11px] font-label font-bold text-outline uppercase tracking-[0.2em] border-b border-surface-container-high">
-                                    <th class="pb-4 px-4">Date</th>
-                                    <th class="pb-4 px-4">Customer</th>
-                                    <th class="pb-4 px-4 text-right">Amount</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-surface-container-low">
-                                <tr v-for="sale in recent_sales" :key="sale.id" class="group hover:bg-surface-container-low/50 transition-colors">
-                                    <td class="py-4 px-4 text-sm font-body text-on-surface-variant font-medium">{{ sale.date }}</td>
-                                    <td class="py-4 px-4">
-                                        <div class="flex items-center gap-3">
-                                            <div class="w-8 h-8 rounded-full bg-secondary-container flex items-center justify-center text-on-secondary-container text-[10px] font-bold font-headline shrink-0">
-                                                {{ getInitials(sale.customer_name) }}
-                                            </div>
-                                            <span class="text-sm font-body text-on-background font-bold truncate">{{ sale.customer_name }}</span>
-                                        </div>
-                                    </td>
-                                    <td class="py-4 px-4 text-right text-sm font-body text-on-background font-black">{{ formatCurrency(sale.amount) }}</td>
-                                </tr>
-                                <tr v-if="recent_sales.length === 0">
-                                    <td colspan="3" class="py-12 text-center text-outline text-sm">No recent transactions recorded.</td>
-                                </tr>
-                            </tbody>
-                        </table>
+        <!-- Recent Activity & Chart -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 pb-10">
+            <!-- Daily Sales Chart -->
+            <div class="md:col-span-2 bg-surface-container-lowest border border-outline-variant/20 p-6 rounded-2xl shadow-sm">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-sm font-headline font-bold text-on-surface uppercase tracking-widest">Revenue Trend</h3>
+                    <div class="flex gap-2">
+                        <div class="flex items-center gap-1 text-[10px] text-outline font-bold"><div class="w-2 h-2 bg-primary rounded-full"></div> Last 7 Days</div>
                     </div>
                 </div>
-            </div>
-
-            <!-- Right: Bank Overview -->
-            <div class="lg:col-span-4 space-y-6">
-                <div class="bg-surface-container-low rounded-2xl p-6 border border-outline-variant/10 relative overflow-hidden group">
-                    <h3 class="font-headline text-lg font-bold text-on-surface mb-6 flex items-center gap-2">
-                        <span class="material-symbols-outlined text-secondary">account_balance</span>
-                        Vault Overview
-                    </h3>
-                    <div class="space-y-4">
-                        <div v-for="bank in banks" :key="bank.id" class="bg-surface-container-lowest p-4 rounded-xl flex items-center justify-between border-l-4 border-secondary shadow-sm hover:shadow-md transition-all group/item">
-                            <div>
-                                <div class="text-[10px] font-bold text-outline uppercase tracking-widest mb-1">{{ bank.name }}</div>
-                                <div class="text-lg font-headline font-extrabold text-on-surface">{{ formatCurrency(bank.balance) }}</div>
-                            </div>
-                            <div class="opacity-0 group-hover/item:opacity-10 transition-opacity">
-                                <span class="material-symbols-outlined text-[32px] text-secondary">savings</span>
+                <div class="h-48 flex items-end justify-between gap-2 px-2">
+                    <div v-for="day in chart_data.daily_sales" :key="day.day" class="flex-1 flex flex-col items-center gap-2 group">
+                        <div 
+                            class="w-full bg-primary/20 rounded-t-lg transition-all group-hover:bg-primary/40 relative" 
+                            :style="{ height: (day.amount / Math.max(...chart_data.daily_sales.map(d => d.amount), 1) * 100) + '%' }"
+                        >
+                            <div v-if="day.amount > 0" class="absolute -top-6 left-1/2 -translate-x-1/2 bg-on-surface text-surface text-[8px] px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity">
+                                {{ formatCurrency(day.amount).replace('AED', '') }}
                             </div>
                         </div>
-
-                        <div v-if="banks.length === 0" class="p-8 text-center text-outline italic text-sm">
-                            No bank infrastructure configured yet.
-                        </div>
-
-                        <Link href="/banks" class="mt-4 w-full py-3 rounded-xl border border-secondary/20 text-[11px] font-bold uppercase tracking-widest text-secondary hover:bg-secondary-container/10 transition-colors flex items-center justify-center gap-2">
-                            Manage Financial Nodes
-                            <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
-                        </Link>
+                        <span class="text-[10px] font-bold text-outline uppercase">{{ day.day }}</span>
                     </div>
                 </div>
+            </div>
+
+            <!-- Recent Transactions -->
+            <div class="bg-surface-container-lowest border border-outline-variant/20 rounded-2xl shadow-sm overflow-hidden flex flex-col">
+                <div class="p-4 border-b border-outline-variant/20">
+                    <h3 class="text-sm font-headline font-bold text-on-surface uppercase tracking-widest">Latest Sales</h3>
+                </div>
+                <div class="flex-1 overflow-y-auto max-h-[300px]">
+                    <div v-for="sale in recent_sales" :key="sale.id" class="p-4 border-b border-outline-variant/10 flex justify-between items-center hover:bg-surface-container-low transition-colors">
+                        <div class="min-w-0">
+                            <p class="text-xs font-bold text-on-surface truncate">{{ sale.customer_name }}</p>
+                            <p class="text-[10px] text-outline">{{ sale.date }} • {{ sale.invoice_number }}</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-xs font-black text-on-surface">{{ formatCurrency(sale.amount) }}</p>
+                            <Badge :variant="getStatusVariant(sale.status)" class="!text-[8px] !px-1.5 !py-0">{{ sale.status }}</Badge>
+                        </div>
+                    </div>
+                    <div v-if="recent_sales.length === 0" class="p-8 text-center text-xs text-outline">No recent activity.</div>
+                </div>
+                <Link href="/sales" class="p-3 text-center text-[10px] font-bold text-primary hover:bg-primary/5 transition-colors uppercase tracking-widest">
+                    View All Sales
+                </Link>
             </div>
         </div>
     </div>
 </template>
-
-<style>
-.font-headline { font-family: 'Manrope', sans-serif; }
-.font-label { font-family: 'Inter', sans-serif; }
-
-/* Scoped animation for progress bars to prevent global layout shifting */
-@keyframes barGrow {
-    from { width: 0; }
-}
-.animate-bar-grow { 
-    animation: barGrow 1s ease-out forwards; 
-}
-</style>

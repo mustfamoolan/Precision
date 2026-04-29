@@ -39,12 +39,20 @@ Route::middleware('auth')->group(function () {
     Route::post('/reminders', [\App\Http\Controllers\ReminderController::class, 'store']);
     Route::put('/reminders/{reminder}', [\App\Http\Controllers\ReminderController::class, 'update']);
     Route::delete('/reminders/{reminder}', [\App\Http\Controllers\ReminderController::class, 'destroy']);
-    Route::get('/shipping', function () { return Inertia::render('Shipping'); })->name('shipping');
+    Route::get('/shipping', [\App\Http\Controllers\ShippingToolController::class, 'index'])->name('shipping');
+    Route::post('/shipping', [\App\Http\Controllers\ShippingToolController::class, 'store']);
+    Route::put('/shipping/{shipment}', [\App\Http\Controllers\ShippingToolController::class, 'update']);
+    Route::delete('/shipping/{shipment}', [\App\Http\Controllers\ShippingToolController::class, 'destroy']);
+
     Route::get('/notifications', [\App\Http\Controllers\NotificationController::class, 'index'])->name('notifications');
     Route::get('/api/notifications/unread', [\App\Http\Controllers\NotificationController::class, 'unread']);
     Route::post('/notifications/{id}/read', [\App\Http\Controllers\NotificationController::class, 'markAsRead']);
     Route::post('/notifications/read-all', [\App\Http\Controllers\NotificationController::class, 'markAllAsRead']);
+    
     Route::get('/reports', [\App\Http\Controllers\ReportController::class, 'index'])->name('reports');
+    Route::get('/export/sales', [\App\Http\Controllers\ExportController::class, 'sales'])->name('export.sales');
+    Route::get('/export/expenses', [\App\Http\Controllers\ExportController::class, 'expenses'])->name('export.expenses');
+    Route::get('/export/inventory', [\App\Http\Controllers\ExportController::class, 'inventory'])->name('export.inventory');
     
     // Bank System Routes
     Route::get('/banks', [\App\Http\Controllers\BankController::class, 'index'])->name('banks');

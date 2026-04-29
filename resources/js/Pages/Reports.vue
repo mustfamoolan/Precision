@@ -1,288 +1,174 @@
 <script setup>
+import { ref } from 'vue';
 import MainLayout from '@/Layouts/MainLayout.vue';
 import { Head, router } from '@inertiajs/vue3';
-import { ref, watch } from 'vue';
+import Badge from '@/Components/Badge.vue';
 
 defineOptions({ layout: MainLayout });
 
 const props = defineProps({
     summary: Object,
+    cash_flow: Array,
+    aging: Object,
     top_expenses: Array,
     ledger: Array,
     filters: Object,
 });
 
-const filterType = ref(props.filters.filter || 'month');
-const startDate = ref(props.filters.start_date || props.summary.start_date);
-const endDate = ref(props.filters.end_date || props.summary.end_date);
-
-const updateFilter = () => {
-    router.get('/reports', { 
-        filter: filterType.value,
-        start_date: startDate.value,
-        end_date: endDate.value
-    }, { 
-        preserveState: true, 
-        preserveScroll: true 
-    });
-};
-
-watch(filterType, (val) => {
-    if (val !== 'custom') {
-        updateFilter();
-    }
-});
+const search = ref('');
 
 const formatCurrency = (value) => {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
+    return new Intl.NumberFormat('en-AE', { style: 'currency', currency: 'AED' }).format(value);
 };
 
-const printReport = () => {
-    window.print();
+const handleFilter = (filter) => {
+    router.get('/reports', { filter }, { preserveState: true });
 };
 </script>
 
 <template>
-    <Head title="Business Reports" />
+    <Head title="Financial Reports" />
 
-    <div class="space-y-10 print:space-y-6 animate-in fade-in duration-700">
-        <!-- Page Header & Filters -->
-        <div class="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-6 print:hidden">
+    <div class="space-y-6 animate-in fade-in duration-500 pb-10">
+        <!-- Header -->
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
-                <h1 class="font-headline text-3xl sm:text-4xl font-extrabold text-on-surface tracking-tight mb-2">Business Intel</h1>
-                <p class="text-on-surface-variant font-medium">Precision analytics and professional financial reporting.</p>
+                <h1 class="text-2xl font-headline font-bold text-on-surface tracking-tight">Financial Reports</h1>
+                <p class="text-sm text-outline font-label">{{ summary.period_label }}</p>
             </div>
-            
-            <div class="flex flex-wrap items-center gap-4">
-                <!-- Period Switcher -->
-                <div class="bg-surface-container-highest p-1 rounded-xl border border-outline-variant/20 flex items-center shadow-[0_4px_12px_0_rgba(0,0,0,0.03)]">
-                    <button 
-                        v-for="f in ['week', 'month', 'custom']" 
-                        :key="f"
-                        @click="filterType = f"
-                        class="px-5 py-2 rounded-lg text-[11px] font-black uppercase tracking-widest transition-all"
-                        :class="filterType === f ? 'bg-white text-primary shadow-sm' : 'text-outline hover:text-on-surface'"
-                    >
-                        {{ f }}
-                    </button>
+            <div class="flex items-center gap-2">
+                <div class="bg-surface-container-low p-1 rounded-xl flex gap-1">
+                    <button @click="handleFilter('month')" :class="filters.filter === 'month' ? 'bg-primary text-on-primary' : 'text-outline'" class="px-3 py-1 rounded-lg text-xs font-bold transition-all">Month</button>
+                    <button @click="handleFilter('week')" :class="filters.filter === 'week' ? 'bg-primary text-on-primary' : 'text-outline'" class="px-3 py-1 rounded-lg text-xs font-bold transition-all">Week</button>
                 </div>
+                <div class="flex gap-2">
+                    <a href="/export/sales" class="bg-surface-container-low border border-outline-variant/20 p-2 rounded-lg hover:bg-surface-container-high transition-colors" title="Export Sales">
+                        <span class="material-symbols-outlined text-[18px]">download</span>
+                    </a>
+                </div>
+            </div>
+        </div>
 
-                <!-- Date Picker (M3 Style) -->
-                <div v-if="filterType === 'custom'" class="flex items-center gap-3 bg-surface-container-highest py-2 px-4 rounded-xl border border-outline-variant/20 shadow-[0_4px_12px_0_rgba(0,0,0,0.03)] animate-in slide-in-from-right-4">
-                    <span class="material-symbols-outlined text-outline text-[20px]">calendar_today</span>
+        <!-- KPI Row -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div class="bg-surface-container-lowest border border-outline-variant/20 p-5 rounded-2xl">
+                <p class="text-[10px] font-bold text-outline uppercase tracking-widest mb-1">Total Sales</p>
+                <h3 class="text-xl font-headline font-black text-on-surface">{{ formatCurrency(summary.total_sales) }}</h3>
+            </div>
+            <div class="bg-surface-container-lowest border border-outline-variant/20 p-5 rounded-2xl">
+                <p class="text-[10px] font-bold text-outline uppercase tracking-widest mb-1">Total Expenses</p>
+                <h3 class="text-xl font-headline font-black text-error">{{ formatCurrency(summary.total_expenses) }}</h3>
+            </div>
+            <div class="bg-surface-container-lowest border border-outline-variant/20 p-5 rounded-2xl">
+                <p class="text-[10px] font-bold text-outline uppercase tracking-widest mb-1">Net Profit</p>
+                <h3 class="text-xl font-headline font-black text-emerald-600">{{ formatCurrency(summary.net_profit) }}</h3>
+            </div>
+            <div class="bg-primary/5 border border-primary/20 p-5 rounded-2xl">
+                <p class="text-[10px] font-bold text-primary uppercase tracking-widest mb-1">Total Receivables</p>
+                <h3 class="text-xl font-headline font-black text-primary">{{ formatCurrency(aging.total_receivable) }}</h3>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <!-- Cash Flow Analysis -->
+            <div class="md:col-span-2 bg-surface-container-lowest border border-outline-variant/20 p-6 rounded-2xl shadow-sm">
+                <h3 class="text-sm font-headline font-bold text-on-surface mb-6 flex items-center gap-2">
+                    <span class="material-symbols-outlined text-primary text-[20px]">analytics</span>
+                    Cash Flow Analysis (Last 6 Months)
+                </h3>
+                <div class="h-48 flex items-end justify-between gap-4 px-2">
+                    <div v-for="month in cash_flow" :key="month.month" class="flex-1 flex flex-col items-center gap-2 group">
+                        <div class="w-full flex justify-center gap-1 items-end h-32 relative">
+                            <!-- Inflow Bar -->
+                            <div 
+                                class="w-3 bg-emerald-500/80 rounded-t-sm transition-all group-hover:bg-emerald-500" 
+                                :style="{ height: (month.inflow / Math.max(...cash_flow.map(m => m.inflow)) * 100) + '%' }"
+                                :title="'In: ' + formatCurrency(month.inflow)"
+                            ></div>
+                            <!-- Outflow Bar -->
+                            <div 
+                                class="w-3 bg-error/80 rounded-t-sm transition-all group-hover:bg-error" 
+                                :style="{ height: (month.outflow / Math.max(...cash_flow.map(m => m.inflow)) * 100) + '%' }"
+                                :title="'Out: ' + formatCurrency(month.outflow)"
+                            ></div>
+                        </div>
+                        <span class="text-[10px] font-bold text-outline uppercase">{{ month.month }}</span>
+                    </div>
+                </div>
+                <div class="flex justify-center gap-6 mt-6 border-t border-outline-variant/10 pt-4">
                     <div class="flex items-center gap-2">
-                        <input type="date" v-model="startDate" class="bg-transparent border-none text-xs font-bold text-on-surface p-0 focus:ring-0 w-28" />
-                        <span class="text-outline">→</span>
-                        <input type="date" v-model="endDate" class="bg-transparent border-none text-xs font-bold text-on-surface p-0 focus:ring-0 w-28" />
+                        <div class="w-3 h-3 bg-emerald-500 rounded-full"></div>
+                        <span class="text-[10px] font-bold text-outline uppercase tracking-widest">Inflow (Collections)</span>
                     </div>
-                    <button @click="updateFilter" class="ml-2 p-1.5 bg-primary/10 text-primary rounded-lg hover:bg-primary/20 transition-colors">
-                        <span class="material-symbols-outlined text-[18px]">refresh</span>
-                    </button>
-                </div>
-
-                <!-- Print Button -->
-                <button @click="printReport" class="flex items-center gap-2 bg-gradient-to-br from-primary to-primary-container text-on-primary px-6 py-3 rounded-xl font-black text-[11px] uppercase tracking-widest shadow-[0_8px_16px_-4px_rgba(0,62,199,0.2)] hover:shadow-[0_12px_24px_-4px_rgba(0,62,199,0.3)] transition-all active:scale-95">
-                    <span class="material-symbols-outlined text-[20px]">print</span>
-                    Print Intel
-                </button>
-            </div>
-        </div>
-
-        <!-- REPORT CANVAS -->
-        <div class="space-y-10 print:space-y-8">
-            <!-- Print Header -->
-            <div class="hidden print:flex justify-between items-center border-b-2 border-primary pb-8 mb-10">
-                <div>
-                    <h1 class="text-4xl font-black font-headline text-primary tracking-tighter">PRECISION</h1>
-                    <p class="text-[10px] font-bold text-outline uppercase tracking-[0.4em]">Business Intelligence Division</p>
-                </div>
-                <div class="text-right">
-                    <div class="text-[10px] font-black text-outline uppercase tracking-widest mb-1">Generated Period</div>
-                    <div class="text-base font-black text-on-surface">{{ summary.period_label }}</div>
-                </div>
-            </div>
-
-            <!-- KPI Cards (Bento Style 100%) -->
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <!-- Revenue Card -->
-                <div class="bg-surface-container-lowest rounded-2xl p-7 shadow-[0_8px_24px_0_rgba(0,0,0,0.04)] border border-outline-variant/10 relative overflow-hidden group">
-                    <div class="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity">
-                        <span class="material-symbols-outlined text-[72px] text-primary">trending_up</span>
-                    </div>
-                    <div class="flex items-center gap-3 mb-5">
-                        <div class="w-10 h-10 rounded-full bg-primary-fixed flex items-center justify-center text-primary">
-                            <span class="material-symbols-outlined text-xl">payments</span>
-                        </div>
-                        <span class="font-label font-bold text-outline text-[11px] uppercase tracking-[0.2em]">Total Revenue</span>
-                    </div>
-                    <div class="font-headline text-4xl font-extrabold text-on-surface mb-2 tracking-tight">{{ formatCurrency(summary.total_sales) }}</div>
-                    <div class="flex items-center gap-1">
-                        <span class="text-[10px] bg-[#e6f4ea] text-[#137333] px-2 py-0.5 rounded-full font-bold border border-[#ceead6]">
-                            {{ summary.sales_count }} INVOICES
-                        </span>
-                    </div>
-                </div>
-
-                <!-- Expenses Card -->
-                <div class="bg-surface-container-lowest rounded-2xl p-7 shadow-[0_8px_24px_0_rgba(0,0,0,0.04)] border border-outline-variant/10 relative overflow-hidden group">
-                    <div class="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity">
-                        <span class="material-symbols-outlined text-[72px] text-tertiary">receipt_long</span>
-                    </div>
-                    <div class="flex items-center gap-3 mb-5">
-                        <div class="w-10 h-10 rounded-full bg-surface-container-high flex items-center justify-center text-on-surface-variant">
-                            <span class="material-symbols-outlined text-xl">account_balance_wallet</span>
-                        </div>
-                        <span class="font-label font-bold text-outline text-[11px] uppercase tracking-[0.2em]">Operational Costs</span>
-                    </div>
-                    <div class="font-headline text-4xl font-extrabold text-error mb-2 tracking-tight">{{ formatCurrency(summary.total_expenses) }}</div>
-                    <div class="flex items-center gap-1">
-                        <span class="text-[10px] bg-[#fdf2f2] text-error px-2 py-0.5 rounded-full font-bold border border-[#fbd5d5]">
-                            {{ summary.expenses_count }} ENTries
-                        </span>
-                    </div>
-                </div>
-
-                <!-- Profit Card (Premium Gradient) -->
-                <div class="bg-gradient-to-br from-primary to-primary-container rounded-2xl p-7 shadow-[0_12px_32px_0_rgba(0,62,199,0.15)] relative overflow-hidden group">
-                    <div class="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl pointer-events-none"></div>
-                    <div class="relative z-10">
-                        <div class="flex items-center gap-3 mb-5">
-                            <div class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-on-primary backdrop-blur-md">
-                                <span class="material-symbols-outlined text-xl" style="font-variation-settings: 'FILL' 1;">stars</span>
-                            </div>
-                            <span class="font-label font-bold text-on-primary-container text-[11px] uppercase tracking-[0.2em] opacity-80">Net Surplus</span>
-                        </div>
-                        <div class="font-headline text-4xl font-extrabold text-on-primary mb-2 tracking-tight">{{ formatCurrency(summary.net_profit) }}</div>
-                        <div class="flex items-center gap-1">
-                            <span class="text-[10px] text-on-primary font-bold uppercase tracking-widest opacity-60 flex items-center gap-1">
-                                <span class="w-1 h-1 bg-white rounded-full"></span>
-                                Performance Node Active
-                            </span>
-                        </div>
+                    <div class="flex items-center gap-2">
+                        <div class="w-3 h-3 bg-error rounded-full"></div>
+                        <span class="text-[10px] font-bold text-outline uppercase tracking-widest">Outflow (Expenses)</span>
                     </div>
                 </div>
             </div>
 
-            <!-- Detailed Ledger Table (Enhanced Stitch Style) -->
-            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-                <div class="lg:col-span-8 bg-surface-container-lowest print:bg-white rounded-2xl border border-outline-variant/10 shadow-[0_8px_24px_0_rgba(0,0,0,0.03)] p-6 overflow-hidden print:shadow-none print:border-none print:p-0">
-                    <div class="flex items-center justify-between mb-8 print:mb-4">
-                        <h3 class="font-headline text-xl font-bold text-on-surface">Financial Record Feed</h3>
-                        <div class="text-[10px] font-black text-outline uppercase tracking-widest print:hidden">Sorted by Date Desc</div>
+            <!-- Debt Aging Summary -->
+            <div class="bg-surface-container-lowest border border-outline-variant/20 p-6 rounded-2xl shadow-sm">
+                <h3 class="text-sm font-headline font-bold text-on-surface mb-6">Receivables Aging</h3>
+                <div class="space-y-4">
+                    <div class="flex justify-between items-end border-b border-outline-variant/10 pb-2">
+                        <span class="text-xs text-outline font-bold">Current (<30d)</span>
+                        <span class="text-sm font-black text-on-surface">{{ formatCurrency(aging.current) }}</span>
                     </div>
-                    
-                    <div class="w-full overflow-x-auto">
-                        <table class="w-full text-left border-separate border-spacing-y-2">
-                            <thead>
-                                <tr class="text-[10px] font-black text-outline uppercase tracking-widest border-b border-surface-container-high">
-                                    <th class="pb-2 px-4 w-[25%]">Date</th>
-                                    <th class="pb-2 px-4 w-[50%]">Transaction Entity</th>
-                                    <th class="pb-2 px-4 w-[25%] text-right">Balance Impact</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr v-for="(item, i) in ledger" :key="i" class="group hover:bg-surface-container-low transition-colors">
-                                    <td class="py-4 px-4 text-xs font-bold text-on-surface bg-surface-container-low/30 group-hover:bg-surface-container-low rounded-l-xl transition-colors">{{ item.date }}</td>
-                                    <td class="py-4 px-4 bg-surface-container-low/30 group-hover:bg-surface-container-low transition-colors">
-                                        <div class="flex items-center gap-3">
-                                            <div class="w-8 h-8 rounded-full flex items-center justify-center shrink-0" :class="item.type === 'sale' ? 'bg-[#e6f4ea] text-[#137333]' : 'bg-error-container/30 text-error'">
-                                                <span class="material-symbols-outlined text-[18px]">{{ item.type === 'sale' ? 'add' : 'remove' }}</span>
-                                            </div>
-                                            <span class="text-sm font-body text-on-background font-bold truncate">{{ item.name }}</span>
-                                        </div>
-                                    </td>
-                                    <td class="py-4 px-4 text-right rounded-r-xl bg-surface-container-low/30 group-hover:bg-surface-container-low transition-colors">
-                                        <span class="text-sm font-headline font-black" :class="item.type === 'sale' ? 'text-on-surface' : 'text-error'">
-                                            {{ item.type === 'expense' ? '-' : '+' }}{{ formatCurrency(item.amount) }}
-                                        </span>
-                                    </td>
-                                </tr>
-                                <tr v-if="ledger.length === 0">
-                                    <td colspan="3" class="py-20 text-center">
-                                        <span class="material-symbols-outlined text-outline-variant text-[48px] mb-4">folder_off</span>
-                                        <p class="text-outline text-sm font-bold uppercase tracking-widest">No intelligence found in this sector</p>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
+                    <div class="flex justify-between items-end border-b border-outline-variant/10 pb-2">
+                        <span class="text-xs text-outline font-bold">30 - 60 Days</span>
+                        <span class="text-sm font-black text-orange-600">{{ formatCurrency(aging['30_60_days']) }}</span>
+                    </div>
+                    <div class="flex justify-between items-end border-b border-outline-variant/10 pb-2">
+                        <span class="text-xs text-outline font-bold">60 - 90 Days</span>
+                        <span class="text-sm font-black text-error/80">{{ formatCurrency(aging['60_90_days']) }}</span>
+                    </div>
+                    <div class="flex justify-between items-end border-b border-outline-variant/10 pb-2">
+                        <span class="text-xs text-outline font-bold">Over 90 Days</span>
+                        <span class="text-sm font-black text-error">{{ formatCurrency(aging.over_90_days) }}</span>
                     </div>
                 </div>
-
-                <!-- Right Rail: Expense Intelligence -->
-                <div class="lg:col-span-4 space-y-8 print:break-before-page">
-                    <div class="bg-surface-container-low rounded-2xl border border-outline-variant/10 p-7 shadow-sm print:bg-white print:border-none print:shadow-none print:p-0">
-                        <h3 class="font-headline text-lg font-bold text-on-surface mb-8 print:mb-4">Cost Distribution</h3>
-                        
-                        <div class="space-y-8">
-                            <div v-for="item in top_expenses" :key="item.description" class="space-y-3">
-                                <div class="flex justify-between text-[10px] font-black uppercase tracking-widest">
-                                    <span class="text-on-surface-variant truncate pr-4">{{ item.description }}</span>
-                                    <span class="text-error">{{ formatCurrency(item.total) }}</span>
-                                </div>
-                                <div class="w-full h-2 bg-surface-container-highest rounded-full overflow-hidden shadow-inner">
-                                    <div 
-                                        class="h-full bg-gradient-to-r from-error/60 to-error rounded-full transition-all duration-1000"
-                                        :style="{ width: (item.total / summary.total_expenses * 100) + '%' }"
-                                    ></div>
-                                </div>
-                            </div>
-                            <div v-if="top_expenses.length === 0" class="py-12 text-center text-outline text-xs italic">Sector cleared. No expenses.</div>
-                        </div>
-
-                        <div class="mt-12 p-5 bg-white/40 dark:bg-white/5 rounded-xl border border-white/20 backdrop-blur-md">
-                            <h4 class="text-[9px] font-black text-on-surface-variant uppercase tracking-[0.3em] mb-2">Internal Note</h4>
-                            <p class="text-[11px] text-on-surface-variant font-medium leading-relaxed italic opacity-80">Reports are synchronized with the primary vault ledger. All calculations are real-time.</p>
-                        </div>
-                    </div>
+                <div class="mt-6 p-4 bg-error/5 rounded-xl border border-error/10">
+                    <p class="text-[10px] text-error font-bold uppercase tracking-widest mb-1">Critical Debt (>60d)</p>
+                    <p class="text-lg font-headline font-black text-error">{{ formatCurrency(aging['60_90_days'] + aging.over_90_days) }}</p>
                 </div>
             </div>
         </div>
 
-        <!-- Professional Print Legal Footer -->
-        <div class="hidden print:block text-center mt-20 pt-10 border-t border-slate-100">
-            <p class="text-[10px] text-outline font-bold uppercase tracking-[0.1em] mb-4 italic">This document is proprietary information of the Precision Admin Platform.</p>
-            <div class="flex justify-center gap-20 mt-10">
-                <div class="text-center">
-                    <div class="w-40 border-b border-on-background mb-2"></div>
-                    <span class="text-[9px] font-black text-outline uppercase tracking-widest">Authorized Auditor</span>
+        <!-- Ledger Table -->
+        <div class="bg-surface-container-lowest border border-outline-variant/20 rounded-2xl shadow-sm overflow-hidden">
+            <div class="p-4 border-b border-outline-variant/20 flex justify-between items-center">
+                <h3 class="text-sm font-headline font-bold text-on-surface uppercase tracking-widest">Transaction Ledger</h3>
+                <div class="flex gap-2">
+                    <button class="p-2 border border-outline-variant/20 rounded-lg hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-[18px]">print</span></button>
                 </div>
-                <div class="text-center">
-                    <div class="w-40 border-b border-on-background mb-2">{{ new Date().toLocaleDateString() }}</div>
-                    <span class="text-[9px] font-black text-outline uppercase tracking-widest">Date of Issue</span>
-                </div>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-surface-container-low/50 text-[11px] font-bold text-outline uppercase tracking-wider">
+                            <th class="px-6 py-4">Date</th>
+                            <th class="px-6 py-4">Transaction</th>
+                            <th class="px-6 py-4">Type</th>
+                            <th class="px-6 py-4">Total</th>
+                            <th class="px-6 py-4">Paid</th>
+                            <th class="px-6 py-4">Due</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-outline-variant/10">
+                        <tr v-for="item in ledger" :key="item.id" class="text-xs hover:bg-surface-container-low/30 transition-colors">
+                            <td class="px-6 py-4 text-outline">{{ item.date }}</td>
+                            <td class="px-6 py-4 font-bold">{{ item.name }}</td>
+                            <td class="px-6 py-4">
+                                <Badge :variant="item.type === 'sale' ? 'success' : 'error'">{{ item.type.toUpperCase() }}</Badge>
+                            </td>
+                            <td class="px-6 py-4 font-black">{{ formatCurrency(item.amount) }}</td>
+                            <td class="px-6 py-4 font-bold text-emerald-600">{{ formatCurrency(item.paid_amount) }}</td>
+                            <td class="px-6 py-4 font-bold" :class="item.due_amount > 0 ? 'text-error' : 'text-outline'">{{ formatCurrency(item.due_amount) }}</td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
 </template>
-
-<style>
-.font-headline { font-family: 'Manrope', sans-serif; }
-.font-label { font-family: 'Inter', sans-serif; }
-
-@media print {
-    header, nav, footer, .print-hidden, [role="navigation"], button {
-        display: none !important;
-    }
-    
-    main, .ml-64, .lg\:ml-64 {
-        margin-left: 0 !important;
-        padding: 0 !important;
-    }
-    
-    body {
-        background-color: white !important;
-        color: black !important;
-    }
-
-    .bg-surface-container-low\/30 {
-        background-color: #f9fafb !important;
-    }
-
-    .text-error { color: #ba1a1a !important; }
-    .text-primary { color: #003ec7 !important; }
-    
-    .shadow-\[0_8px_24px_0_rgba\(0\,0\,0\,0\.04\)\] {
-        box-shadow: none !important;
-    }
-}
-</style>
