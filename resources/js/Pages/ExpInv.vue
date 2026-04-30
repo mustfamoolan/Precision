@@ -17,10 +17,21 @@ const props = defineProps({
     summary: Object,
     filters: Object,
     banks: Array,
+    customers: {
+        type: Array,
+        default: () => []
+    },
+    local_invoices: {
+        type: Array,
+        default: () => []
+    }
 });
 
 const showAddModal = ref(false);
 const search = ref(props.filters.search || '');
+const startDate = ref(props.filters.start_date || '');
+const endDate = ref(props.filters.end_date || '');
+const selectedStatus = ref(props.filters.status || 'all');
 
 const form = useForm({
     date: new Date().toISOString().substr(0, 10),
@@ -48,238 +59,218 @@ const handleSearch = () => {
     router.get('/sales', { 
         search: search.value,
         type: 'export',
-        filter: props.filters.filter
+        start_date: startDate.value,
+        end_date: endDate.value,
+        status: selectedStatus.value,
     }, { preserveState: true, preserveScroll: true });
 };
 
+watch(selectedStatus, () => handleSearch());
+
 const formatCurrency = (value) => {
-    return new Intl.NumberFormat('en-AE', { style: 'currency', currency: 'AED' }).format(value);
-};
-
-const getStatusVariant = (status) => {
-    switch (status) {
-        case 'paid': return 'success';
-        case 'partial': return 'warning';
-        case 'unpaid': return 'error';
-        default: return 'neutral';
-    }
-};
-
-const getShippingVariant = (status) => {
-    switch (status) {
-        case 'Delivered': return 'success';
-        case 'In Transit': return 'orange';
-        case 'On Board': return 'info';
-        default: return 'neutral';
-    }
+    return new Intl.NumberFormat('en-AE', { style: 'currency', currency: 'AED' }).format(value || 0);
 };
 
 const shippingStatuses = ['On Board', 'In Transit', 'Delivered'];
+const statuses = [{label: 'All Status', value: 'all'}, {label: 'Paid', value: 'paid'}, {label: 'Partial', value: 'partial'}, {label: 'Pending', value: 'pending'}];
 </script>
 
 <template>
     <Head title="Export Invoices" />
 
-    <div class="space-y-6 animate-in fade-in duration-500">
+    <div class="min-h-screen bg-[#f8fafc] pb-20 px-4 sm:px-6 lg:px-8">
         <!-- Page Header -->
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div class="py-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
             <div>
-                <h1 class="text-2xl font-headline font-bold text-on-surface tracking-tight">EXP INV</h1>
-                <p class="text-sm text-outline font-label">Manage export invoices (Container sales)</p>
+                <h1 class="text-4xl font-black text-slate-900 tracking-tight">Export Invoices</h1>
+                <p class="mt-1 text-slate-500 font-medium">Manage export container sales</p>
             </div>
-            <div class="flex items-center gap-3">
-                <button class="bg-surface-container-low border border-outline-variant/30 px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-surface-container-high transition-colors">
-                    <span class="material-symbols-outlined text-[18px]">calendar_today</span>
-                    Apr 28, 2024
-                </button>
-                <button class="bg-surface-container-low border border-outline-variant/30 p-2 rounded-lg relative">
-                    <span class="material-symbols-outlined">notifications</span>
-                    <span class="absolute top-1 right-1 w-2 h-2 bg-error rounded-full"></span>
+
+            <div class="flex flex-wrap items-center gap-3">
+                <!-- Date range -->
+                <div class="flex items-center gap-2 bg-white border border-slate-200 rounded-2xl px-4 py-2.5 shadow-sm">
+                    <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest">From</span>
+                    <input type="date" v-model="startDate" class="text-xs font-bold text-slate-600 outline-none bg-transparent cursor-pointer" />
+                </div>
+                <div class="flex items-center gap-2 bg-white border border-slate-200 rounded-2xl px-4 py-2.5 shadow-sm">
+                    <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest">To</span>
+                    <input type="date" v-model="endDate" class="text-xs font-bold text-slate-600 outline-none bg-transparent cursor-pointer" />
+                </div>
+                <button @click="handleSearch"
+                    class="px-5 py-2.5 bg-indigo-600 text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all active:scale-95"
+                >Apply</button>
+                <button @click="() => {startDate = ''; endDate = ''; handleSearch();}" 
+                    class="px-3 py-2.5 bg-rose-50 text-rose-600 border border-rose-100 rounded-2xl hover:bg-rose-100 transition-all" title="Clear Dates"
+                >
+                    <span class="material-symbols-outlined text-sm block leading-none">close</span>
                 </button>
             </div>
         </div>
 
         <!-- KPI Cards -->
-        <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
-            <div class="bg-surface-container-lowest border border-outline-variant/20 p-5 rounded-2xl shadow-sm">
-                <div class="p-3 bg-purple-500/10 rounded-xl w-fit mb-4">
-                    <span class="material-symbols-outlined text-purple-500">public</span>
-                </div>
-                <div class="space-y-1">
-                    <p class="text-[10px] font-bold text-outline uppercase tracking-widest">Total Export Sales</p>
-                    <h3 class="text-xl font-headline font-black text-on-surface">{{ formatCurrency(summary.total_amount) }}</h3>
-                    <p class="text-[10px] text-emerald-500 font-bold flex items-center gap-1">
-                        <span class="material-symbols-outlined text-[12px]">trending_up</span>
-                        18.6% from last month
-                    </p>
-                </div>
-            </div>
-
-            <div class="bg-surface-container-lowest border border-outline-variant/20 p-5 rounded-2xl shadow-sm">
-                <div class="p-3 bg-emerald-500/10 rounded-xl w-fit mb-4">
-                    <span class="material-symbols-outlined text-emerald-500">account_balance</span>
-                </div>
-                <div class="space-y-1">
-                    <p class="text-[10px] font-bold text-outline uppercase tracking-widest">Paid Amount</p>
-                    <h3 class="text-xl font-headline font-black text-on-surface">{{ formatCurrency(summary.total_paid) }}</h3>
-                    <p class="text-[10px] text-outline font-bold">63.8% of total</p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-6 mb-12">
+            <!-- Total Export Sales -->
+            <div class="group relative overflow-hidden bg-white/80 backdrop-blur-xl rounded-[2.5rem] p-8 border border-white shadow-xl shadow-slate-200/50 transition-all hover:-translate-y-1 hover:shadow-2xl">
+                <div class="relative z-10">
+                    <div class="flex items-center justify-between mb-6">
+                        <div class="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-600">
+                            <span class="material-symbols-outlined text-3xl">public</span>
+                        </div>
+                    </div>
+                    <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Total Sales</p>
+                    <h2 class="text-3xl font-black text-slate-900 tracking-tighter">{{ formatCurrency(summary.total_amount) }}</h2>
                 </div>
             </div>
 
-            <div class="bg-surface-container-lowest border border-outline-variant/20 p-5 rounded-2xl shadow-sm">
-                <div class="p-3 bg-orange-500/10 rounded-xl w-fit mb-4">
-                    <span class="material-symbols-outlined text-orange-500">schedule</span>
-                </div>
-                <div class="space-y-1">
-                    <p class="text-[10px] font-bold text-outline uppercase tracking-widest">Pending Amount</p>
-                    <h3 class="text-xl font-headline font-black text-on-surface">{{ formatCurrency(summary.total_pending) }}</h3>
-                    <p class="text-[10px] text-outline font-bold">29.6% of total</p>
-                </div>
-            </div>
-
-            <div class="bg-surface-container-lowest border border-outline-variant/20 p-5 rounded-2xl shadow-sm">
-                <div class="p-3 bg-error/10 rounded-xl w-fit mb-4">
-                    <span class="material-symbols-outlined text-error">warning</span>
-                </div>
-                <div class="space-y-1">
-                    <p class="text-[10px] font-bold text-outline uppercase tracking-widest">Overdue Amount</p>
-                    <h3 class="text-xl font-headline font-black text-on-surface">{{ formatCurrency(summary.total_overdue) }}</h3>
-                    <p class="text-[10px] text-outline font-bold">6.6% of total</p>
+            <!-- Paid Amount -->
+            <div class="group relative overflow-hidden bg-white/80 backdrop-blur-xl rounded-[2.5rem] p-8 border border-white shadow-xl shadow-slate-200/50 transition-all hover:-translate-y-1 hover:shadow-2xl">
+                <div class="relative z-10">
+                    <div class="flex items-center justify-between mb-6">
+                        <div class="w-14 h-14 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600">
+                            <span class="material-symbols-outlined text-3xl">account_balance</span>
+                        </div>
+                    </div>
+                    <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Paid Amount</p>
+                    <h2 class="text-3xl font-black text-slate-900 tracking-tighter">{{ formatCurrency(summary.total_paid) }}</h2>
                 </div>
             </div>
 
-            <div class="bg-surface-container-lowest border border-outline-variant/20 p-5 rounded-2xl shadow-sm">
-                <div class="p-3 bg-primary/10 rounded-xl w-fit mb-4">
-                    <span class="material-symbols-outlined text-primary">description</span>
+            <!-- Pending Amount -->
+            <div class="group relative overflow-hidden bg-white/80 backdrop-blur-xl rounded-[2.5rem] p-8 border border-white shadow-xl shadow-slate-200/50 transition-all hover:-translate-y-1 hover:shadow-2xl">
+                <div class="relative z-10">
+                    <div class="flex items-center justify-between mb-6">
+                        <div class="w-14 h-14 rounded-2xl bg-orange-50 flex items-center justify-center text-orange-600">
+                            <span class="material-symbols-outlined text-3xl">schedule</span>
+                        </div>
+                    </div>
+                    <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Pending</p>
+                    <h2 class="text-3xl font-black text-slate-900 tracking-tighter">{{ formatCurrency(summary.total_pending) }}</h2>
                 </div>
-                <div class="space-y-1">
-                    <p class="text-[10px] font-bold text-outline uppercase tracking-widest">Total Invoices</p>
-                    <h3 class="text-xl font-headline font-black text-on-surface">{{ summary.total_count }}</h3>
-                    <p class="text-[10px] text-outline font-bold">This Month</p>
+            </div>
+
+            <!-- Overdue Amount -->
+            <div class="group relative overflow-hidden bg-white/80 backdrop-blur-xl rounded-[2.5rem] p-8 border border-white shadow-xl shadow-slate-200/50 transition-all hover:-translate-y-1 hover:shadow-2xl">
+                <div class="relative z-10">
+                    <div class="flex items-center justify-between mb-6">
+                        <div class="w-14 h-14 rounded-2xl bg-rose-50 flex items-center justify-center text-rose-600">
+                            <span class="material-symbols-outlined text-3xl">warning</span>
+                        </div>
+                    </div>
+                    <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Overdue</p>
+                    <h2 class="text-3xl font-black text-slate-900 tracking-tighter">{{ formatCurrency(summary.total_overdue) }}</h2>
+                </div>
+            </div>
+
+            <!-- Total Invoices -->
+            <div class="group relative overflow-hidden bg-white/80 backdrop-blur-xl rounded-[2.5rem] p-8 border border-white shadow-xl shadow-slate-200/50 transition-all hover:-translate-y-1 hover:shadow-2xl">
+                <div class="relative z-10">
+                    <div class="flex items-center justify-between mb-6">
+                        <div class="w-14 h-14 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600">
+                            <span class="material-symbols-outlined text-3xl">description</span>
+                        </div>
+                    </div>
+                    <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Invoices</p>
+                    <h2 class="text-3xl font-black text-slate-900 tracking-tighter">{{ summary.total_count }}</h2>
                 </div>
             </div>
         </div>
 
-        <!-- Table Section -->
-        <div class="bg-surface-container-lowest border border-outline-variant/20 rounded-2xl shadow-sm overflow-hidden">
-            <div class="p-4 border-b border-outline-variant/20 flex flex-col md:flex-row justify-between items-center gap-4">
-                <div class="flex items-center gap-2">
-                    <SelectInput :options="[{label: 'Apr 1, 2024 - Apr 28, 2024', value: 'range'}]" class="!w-56 !py-1.5" />
-                    <SelectInput :options="[{label: 'All Customers', value: 'all'}]" class="!w-40 !py-1.5" />
-                    <SelectInput :options="[{label: 'All Status', value: 'all'}]" class="!w-32 !py-1.5" />
+        <!-- Table Container -->
+        <div class="bg-white rounded-[2.5rem] shadow-2xl shadow-slate-200/50 border border-slate-100 overflow-hidden flex flex-col">
+            <!-- Toolbar -->
+            <div class="p-8 border-b border-slate-100 flex flex-wrap xl:flex-nowrap justify-between items-center gap-4">
+                
+                <div class="flex items-center gap-4 w-full xl:w-auto">
+                    <div>
+                        <h3 class="text-xl font-black text-slate-900 uppercase tracking-tight">Export Records</h3>
+                        <p class="text-sm text-slate-400 font-medium mt-0.5">{{ sales.length }} records found</p>
+                    </div>
+
+                    <div class="h-8 w-px bg-slate-200 mx-2 hidden sm:block"></div>
+
+                    <select v-model="selectedStatus" class="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-xs font-bold text-slate-600 outline-none focus:ring-2 focus:ring-indigo-400 cursor-pointer w-40">
+                        <option v-for="s in statuses" :key="s.value" :value="s.value">{{ s.label }}</option>
+                    </select>
                 </div>
                 
                 <div class="flex flex-1 max-w-md relative">
-                    <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[18px]">search</span>
+                    <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">search</span>
                     <input 
                         v-model="search"
                         @keyup.enter="handleSearch"
                         type="text" 
                         placeholder="Search invoice, customer, container..." 
-                        class="w-full pl-10 pr-4 py-2 bg-surface-container-low rounded-xl border border-outline-variant/20 focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm font-label transition-all"
+                        class="w-full pl-12 pr-4 py-3 bg-slate-50 rounded-2xl border border-slate-200 focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-400 text-sm font-medium transition-all"
                     />
                 </div>
 
                 <div class="flex items-center gap-2">
-                    <PrimaryButton @click="showAddModal = true" class="flex items-center gap-2 !py-2">
+                    <button @click="showAddModal = true" class="flex items-center gap-2 px-6 py-3 bg-indigo-50 text-indigo-600 border border-indigo-100 rounded-2xl text-xs font-black uppercase tracking-widest shadow-sm hover:bg-indigo-100 transition-all active:scale-95">
                         <span class="material-symbols-outlined text-[18px]">add</span>
                         Add EXP Invoice
-                    </PrimaryButton>
-                    <button class="p-2 border border-outline-variant/20 rounded-lg hover:bg-surface-container-high transition-colors">
-                        <span class="material-symbols-outlined text-[18px]">ios_share</span>
                     </button>
                 </div>
             </div>
 
-            <div class="overflow-x-auto">
+            <!-- Table -->
+            <div class="overflow-x-auto flex-1">
                 <table class="w-full text-left border-collapse">
                     <thead>
-                        <tr class="bg-surface-container-low/50 text-[11px] font-bold text-outline uppercase tracking-wider">
-                            <th class="px-6 py-4">Invoice #</th>
-                            <th class="px-6 py-4">Invoice Date</th>
-                            <th class="px-6 py-4">Customer</th>
-                            <th class="px-6 py-4">Container / Shipment</th>
-                            <th class="px-6 py-4">Total Amount (AED)</th>
-                            <th class="px-6 py-4">Paid (AED)</th>
-                            <th class="px-6 py-4">Due (AED)</th>
-                            <th class="px-6 py-4">Status</th>
-                            <th class="px-6 py-4 text-center">Actions</th>
+                        <tr class="bg-slate-50/50 text-lg font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
+                            <th class="py-6 px-8">Invoice #</th>
+                            <th class="py-6 px-8">Invoice Date</th>
+                            <th class="py-6 px-8">Customer</th>
+                            <th class="py-6 px-8">Container / Shipment</th>
+                            <th class="py-6 px-8">Total Amount</th>
+                            <th class="py-6 px-8">Paid Amount</th>
+                            <th class="py-6 px-8 text-right">Remaining Due</th>
+                            <th class="py-6 px-8">Status</th>
+                            <th class="py-6 px-8 text-center">Actions</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-outline-variant/10">
-                        <tr v-for="sale in sales" :key="sale.id" class="hover:bg-surface-container-low/30 transition-colors group">
-                            <td class="px-6 py-4 text-xs font-bold text-on-surface">{{ sale.invoice_number }}</td>
-                            <td class="px-6 py-4 text-xs text-on-surface-variant">{{ sale.date }}</td>
-                            <td class="px-6 py-4 text-xs font-bold text-on-surface">{{ sale.customer_name }}</td>
-                            <td class="px-6 py-4">
-                                <div class="flex items-center gap-2 text-xs font-bold text-primary">
-                                    <span class="material-symbols-outlined text-[16px]">directions_boat</span>
+                    <tbody class="divide-y divide-slate-50">
+                        <tr v-for="sale in sales" :key="sale.id" class="group hover:bg-slate-50/50 transition-colors">
+                            <td class="py-6 px-8 text-xl font-bold text-slate-900 whitespace-nowrap">{{ sale.invoice_number }}</td>
+                            <td class="py-6 px-8 text-xl font-bold text-slate-500 whitespace-nowrap">{{ sale.date }}</td>
+                            <td class="py-6 px-8 text-xl font-medium text-slate-600 whitespace-nowrap">{{ sale.customer_name }}</td>
+                            <td class="py-6 px-8 whitespace-nowrap">
+                                <div class="flex items-center gap-2 text-xl font-bold text-slate-600" v-if="sale.container_number">
+                                    <span class="material-symbols-outlined text-[18px] text-indigo-400">directions_boat</span>
                                     {{ sale.container_number }}
                                 </div>
+                                <span v-else class="text-base text-slate-400 uppercase tracking-widest">N/A</span>
                             </td>
-                            <td class="px-6 py-4 text-xs font-black text-on-surface">{{ formatCurrency(sale.amount).replace('AED', '') }}</td>
-                            <td class="px-6 py-4 text-xs font-bold text-on-surface">{{ formatCurrency(sale.paid_amount).replace('AED', '') }}</td>
-                            <td class="px-6 py-4 text-xs font-bold text-on-surface">{{ formatCurrency(sale.due_amount).replace('AED', '') }}</td>
-                            <td class="px-6 py-4">
-                                <Badge :variant="getStatusVariant(sale.status)">{{ sale.status }}</Badge>
+                            <td class="py-6 px-8 text-2xl font-black text-slate-900 whitespace-nowrap">{{ formatCurrency(sale.amount).replace('AED', '') }}</td>
+                            <td class="py-6 px-8 text-2xl font-bold text-emerald-600 whitespace-nowrap">{{ formatCurrency(sale.paid_amount).replace('AED', '') }}</td>
+                            <td class="py-6 px-8 text-2xl font-bold text-right whitespace-nowrap" :class="sale.due_amount > 0 ? 'text-rose-600' : 'text-slate-300'">
+                                {{ formatCurrency(sale.due_amount).replace('AED', '') }}
                             </td>
-                            <td class="px-6 py-4 text-center">
-                                <div class="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <button class="p-1.5 text-outline hover:text-primary transition-colors"><span class="material-symbols-outlined text-[18px]">visibility</span></button>
-                                    <button class="p-1.5 text-outline hover:text-emerald-500 transition-colors"><span class="material-symbols-outlined text-[18px]">print</span></button>
-                                    <button class="p-1.5 text-outline hover:text-error transition-colors"><span class="material-symbols-outlined text-[18px]">more_horiz</span></button>
+                            <td class="py-6 px-8 whitespace-nowrap">
+                                <span class="text-base font-black uppercase tracking-widest px-4 py-2 rounded-md"
+                                      :class="{
+                                          'bg-emerald-50 text-emerald-600': sale.status === 'paid',
+                                          'bg-orange-50 text-orange-600': sale.status === 'partial',
+                                          'bg-rose-50 text-rose-600': sale.status === 'pending' || sale.status === 'unpaid'
+                                      }">
+                                    {{ sale.status }}
+                                </span>
+                            </td>
+                            <td class="py-5 px-8 text-center whitespace-nowrap">
+                                <div class="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button @click="router.delete(`/sales/${sale.id}`)" class="w-8 h-8 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-rose-500 hover:border-rose-200 hover:bg-rose-50 transition-all shadow-sm" title="Delete">
+                                        <span class="material-symbols-outlined text-[16px]">delete</span>
+                                    </button>
                                 </div>
+                            </td>
+                        </tr>
+                        <tr v-if="sales.length === 0">
+                            <td colspan="9" class="py-20 text-center text-slate-400 italic text-sm">
+                                <span class="material-symbols-outlined text-4xl block mb-2 opacity-50">search_off</span>
+                                No export invoices found for the selected filters.
                             </td>
                         </tr>
                     </tbody>
                 </table>
-            </div>
-        </div>
-
-        <!-- Charts Row -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div class="bg-surface-container-lowest border border-outline-variant/20 p-6 rounded-2xl shadow-sm">
-                <h3 class="text-sm font-headline font-bold text-on-surface mb-6">Export Sales by Status</h3>
-                <div class="flex items-center justify-center py-4">
-                    <div class="w-40 h-40 rounded-full border-[12px] border-emerald-500 relative flex items-center justify-center">
-                        <div class="text-center">
-                            <p class="text-[10px] font-bold text-outline uppercase">AED</p>
-                            <p class="text-xl font-headline font-black text-on-surface">{{ summary.total_amount }}</p>
-                            <p class="text-[10px] font-bold text-outline">Total</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="bg-surface-container-lowest border border-outline-variant/20 p-6 rounded-2xl shadow-sm">
-                <h3 class="text-sm font-headline font-bold text-on-surface mb-6">Top Customers (By Amount)</h3>
-                <div class="space-y-4">
-                    <div v-for="sale in sales.slice(0, 4)" :key="sale.id" class="space-y-1">
-                        <div class="flex justify-between text-xs font-bold">
-                            <span class="text-on-surface">{{ sale.customer_name }}</span>
-                            <span class="text-on-surface">{{ formatCurrency(sale.amount) }}</span>
-                        </div>
-                        <div class="w-full bg-surface-container-high rounded-full h-1.5 overflow-hidden">
-                            <div class="bg-primary h-full rounded-full" :style="{width: (sale.amount / summary.total_amount * 100) + '%'}"></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="bg-surface-container-lowest border border-outline-variant/20 p-6 rounded-2xl shadow-sm">
-                <h3 class="text-sm font-headline font-bold text-on-surface mb-6">Recent Shipments</h3>
-                <div class="space-y-4">
-                    <div v-for="sale in sales.slice(0, 4)" :key="sale.id" class="flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-lg bg-surface-container-low flex items-center justify-center text-primary">
-                            <span class="material-symbols-outlined">directions_boat</span>
-                        </div>
-                        <div class="flex-1 min-w-0">
-                            <p class="text-xs font-bold text-on-surface truncate">{{ sale.container_number }}</p>
-                            <p class="text-[10px] text-outline">{{ sale.date }}</p>
-                        </div>
-                        <Badge :variant="getShippingVariant(sale.shipping_status)">{{ sale.shipping_status || 'On Board' }}</Badge>
-                    </div>
-                </div>
             </div>
         </div>
 
@@ -290,17 +281,32 @@ const shippingStatuses = ['On Board', 'In Transit', 'Delivered'];
                     <FormField label="Date" :error="form.errors.date" required>
                         <TextInput v-model="form.date" type="date" />
                     </FormField>
+                    
                     <FormField label="Invoice #" :error="form.errors.invoice_number" required>
-                        <TextInput v-model="form.invoice_number" placeholder="EXP-1000" />
+                        <div class="relative">
+                            <input 
+                                list="local-invoices-list" 
+                                v-model="form.invoice_number" 
+                                placeholder="Select or type..." 
+                                class="w-full bg-slate-50 text-slate-900 placeholder:text-slate-400 text-sm font-medium rounded-xl border border-slate-200 px-4 py-2.5 outline-none focus:ring-2 focus:ring-indigo-400 focus:bg-white transition-all"
+                            />
+                            <datalist id="local-invoices-list">
+                                <option v-for="inv in local_invoices" :key="inv.id" :value="inv.invoice_number"></option>
+                            </datalist>
+                        </div>
                     </FormField>
                 </div>
 
                 <FormField label="Customer Name" :error="form.errors.customer_name" required>
-                    <TextInput v-model="form.customer_name" placeholder="Client Name" />
+                    <SelectInput 
+                        v-model="form.customer_name" 
+                        :options="customers.map(c => ({label: c.name, value: c.name}))" 
+                        placeholder="Select Customer..." 
+                    />
                 </FormField>
 
                 <div class="grid grid-cols-2 gap-4">
-                    <FormField label="Container / Shipment #" :error="form.errors.container_number" required>
+                    <FormField label="Container / Shipment # (Optional)" :error="form.errors.container_number">
                         <TextInput v-model="form.container_number" placeholder="CN-123456" />
                     </FormField>
                     <FormField label="Shipping Status" :error="form.errors.shipping_status" required>
@@ -312,21 +318,19 @@ const shippingStatuses = ['On Board', 'In Transit', 'Delivered'];
                     <FormField label="Total Amount (AED)" :error="form.errors.amount" required>
                         <TextInput v-model="form.amount" type="number" step="0.01" prefix="AED" placeholder="0.00" />
                     </FormField>
-                <div class="grid grid-cols-2 gap-4">
                     <FormField label="Paid Amount (AED)" :error="form.errors.paid_amount">
                         <TextInput v-model="form.paid_amount" type="number" step="0.01" prefix="AED" placeholder="0.00" />
                     </FormField>
-                    <FormField label="Bank/Account" :error="form.errors.bank_id">
-                        <SelectInput 
-                            v-model="form.bank_id" 
-                            :options="banks.map(b => ({ label: b.name, value: b.id }))" 
-                            placeholder="Select Bank"
-                        />
-                    </FormField>
-                </div>
                 </div>
 
-                <div class="pt-6 flex justify-end gap-3 border-t border-outline-variant/10 mt-6">
+                <FormField label="Bank/Account (Optional)" :error="form.errors.bank_id">
+                    <SelectInput 
+                        v-model="form.bank_id" 
+                        :options="[{label: 'None / Cash', value: ''}, ...banks.map(b => ({ label: b.name, value: b.id }))]" 
+                    />
+                </FormField>
+
+                <div class="pt-6 flex justify-end gap-3 border-t border-slate-100 mt-6">
                     <SecondaryButton @click="showAddModal = false" type="button">Cancel</SecondaryButton>
                     <PrimaryButton :loading="form.processing" :disabled="form.processing">
                         Create EXP Invoice
@@ -336,3 +340,8 @@ const shippingStatuses = ['On Board', 'In Transit', 'Delivered'];
         </SideModal>
     </div>
 </template>
+
+<style scoped>
+.font-black { font-weight: 900; }
+.tracking-tighter { letter-spacing: -0.05em; }
+</style>

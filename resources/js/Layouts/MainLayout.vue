@@ -157,6 +157,9 @@ const page = usePage();
                     <span v-if="item.name === 'Notifications' && unreadCount > 0" class="ml-auto bg-error text-on-error text-[10px] font-black px-1.5 py-0.5 rounded-full">
                         {{ unreadCount }}
                     </span>
+                    <span v-if="item.name === 'Reminders' && $page.props.pending_reminders_count > 0" class="ml-auto bg-error text-on-error text-[10px] font-black px-1.5 py-0.5 rounded-full">
+                        {{ $page.props.pending_reminders_count }}
+                    </span>
                 </Link>
             </div>
 

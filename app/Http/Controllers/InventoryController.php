@@ -38,7 +38,6 @@ class InventoryController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'category' => 'nullable|string|max:100',
-            'sku' => 'nullable|string|max:100',
             'cost_price' => 'nullable|numeric|min:0',
             'selling_price' => 'nullable|numeric|min:0',
             'shop_quantity' => 'required|integer|min:0',
@@ -73,7 +72,6 @@ class InventoryController extends Controller
         $validated = $request->validate([
             'name' => 'sometimes|required|string|max:255',
             'category' => 'nullable|string|max:100',
-            'sku' => 'nullable|string|max:100',
             'cost_price' => 'nullable|numeric|min:0',
             'selling_price' => 'nullable|numeric|min:0',
             'shop_quantity' => 'sometimes|required|integer|min:0',

@@ -35,6 +35,8 @@ class DashboardController extends Controller
         // All Bank Balances
         $banks = Bank::all(['id', 'name', 'balance']);
         $totalBankCash = $banks->sum('balance');
+        $bankLiquidity = $banks->filter(fn($b) => !str_contains(strtolower($b->name), 'cash'))->sum('balance');
+        $cashBalance = $banks->filter(fn($b) => str_contains(strtolower($b->name), 'cash'))->sum('balance');
         
         // --- NEW KPIs ---
         $activeShipments = Shipment::whereNotIn('status', ['Completed', 'Delivered'])->count();
@@ -87,6 +89,8 @@ class DashboardController extends Controller
                 'monthly_expenses' => $monthlyExpenses,
                 'net_profit' => $netProfit,
                 'total_bank_cash' => $totalBankCash,
+                'bank_liquidity' => $bankLiquidity,
+                'cash_balance' => $cashBalance,
                 'sales_growth' => round($salesGrowth, 1),
                 'active_shipments' => $activeShipments,
                 'upcoming_cheques' => $upcomingCheques,

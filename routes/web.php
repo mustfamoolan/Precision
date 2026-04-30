@@ -22,6 +22,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/dashboard', [\App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
     Route::get('/sales', [\App\Http\Controllers\SaleController::class, 'index'])->name('sales');
     Route::post('/sales', [\App\Http\Controllers\SaleController::class, 'store']);
+    Route::put('/sales/{sale}', [\App\Http\Controllers\SaleController::class, 'update']);
+    Route::post('/sales/{sale}/payments', [\App\Http\Controllers\SaleController::class, 'storePayment']);
     Route::delete('/sales/{sale}', [\App\Http\Controllers\SaleController::class, 'destroy']);
     Route::get('/expenses', [\App\Http\Controllers\ExpenseController::class, 'index'])->name('expenses');
     Route::post('/expenses', [\App\Http\Controllers\ExpenseController::class, 'store']);
@@ -30,6 +32,10 @@ Route::middleware('auth')->group(function () {
     Route::post('/employees', [\App\Http\Controllers\EmployeeController::class, 'store']);
     Route::put('/employees/{employee}', [\App\Http\Controllers\EmployeeController::class, 'update']);
     Route::delete('/employees/{employee}', [\App\Http\Controllers\EmployeeController::class, 'destroy']);
+    
+    Route::post('/customers', [\App\Http\Controllers\CustomerController::class, 'store']);
+    Route::put('/customers/{customer}', [\App\Http\Controllers\CustomerController::class, 'update']);
+    Route::delete('/customers/{customer}', [\App\Http\Controllers\CustomerController::class, 'destroy']);
     Route::get('/inventory', [\App\Http\Controllers\InventoryController::class, 'index'])->name('inventory');
     Route::post('/inventory', [\App\Http\Controllers\InventoryController::class, 'store']);
     Route::put('/inventory/{inventory}', [\App\Http\Controllers\InventoryController::class, 'update']);

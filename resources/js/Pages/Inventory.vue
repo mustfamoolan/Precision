@@ -22,11 +22,11 @@ const showAddModal = ref(false);
 const showTransferModal = ref(false);
 const selectedItem = ref(null);
 const activeTab = ref('inventory'); // 'inventory' or 'history'
+const locationTab = ref('all'); // 'all', 'shop', 'warehouse', 'remote'
 
 const form = useForm({
     name: '',
     category: '',
-    sku: '',
     cost_price: 0,
     selling_price: 0,
     shop_quantity: 0,
@@ -52,7 +52,6 @@ const openEditModal = (item) => {
     selectedItem.value = item;
     form.name = item.name;
     form.category = item.category;
-    form.sku = item.sku;
     form.cost_price = item.cost_price;
     form.selling_price = item.selling_price;
     form.shop_quantity = item.shop_quantity;
@@ -104,6 +103,17 @@ const locations = [
     { label: 'Main Warehouse', value: 'warehouse' },
     { label: 'Remote Warehouse', value: 'remote' },
 ];
+
+const filteredInventory = computed(() => {
+    if (locationTab.value === 'all') return props.inventory;
+    
+    return props.inventory.filter(item => {
+        if (locationTab.value === 'shop') return item.shop_quantity > 0;
+        if (locationTab.value === 'warehouse') return item.warehouse_quantity > 0;
+        if (locationTab.value === 'remote') return item.remote_quantity > 0;
+        return true;
+    });
+});
 </script>
 
 <template>
@@ -117,7 +127,7 @@ const locations = [
                 <p class="text-sm text-outline font-label">Manage products across 3 storage locations</p>
             </div>
             <div class="flex items-center gap-3">
-                <div class="bg-surface-container-low p-1 rounded-xl flex gap-1">
+                <div class="bg-surface-container-low p-1 rounded-xl flex gap-1 border border-outline-variant/10">
                     <button 
                         @click="activeTab = 'inventory'"
                         :class="[activeTab === 'inventory' ? 'bg-primary text-on-primary shadow-sm' : 'text-outline hover:text-on-surface']"
@@ -174,42 +184,50 @@ const locations = [
         </div>
 
         <!-- Main Content -->
-        <div v-if="activeTab === 'inventory'" class="bg-surface-container-lowest border border-outline-variant/20 rounded-2xl shadow-sm overflow-hidden">
+        <div v-if="activeTab === 'inventory'" class="bg-surface-container-lowest border border-outline-variant/20 rounded-2xl shadow-sm overflow-hidden flex flex-col">
+            
+            <!-- Location Tabs -->
+            <div class="p-4 border-b border-outline-variant/20 flex gap-2 overflow-x-auto">
+                <button @click="locationTab = 'all'" :class="locationTab === 'all' ? 'bg-primary/10 text-primary border-primary/20' : 'bg-surface-container-low text-outline border-outline-variant/20 hover:text-on-surface'" class="px-5 py-2 rounded-lg text-xs font-black uppercase tracking-widest border transition-all">All Locations</button>
+                <button @click="locationTab = 'shop'" :class="locationTab === 'shop' ? 'bg-primary/10 text-primary border-primary/20' : 'bg-surface-container-low text-outline border-outline-variant/20 hover:text-on-surface'" class="px-5 py-2 rounded-lg text-xs font-black uppercase tracking-widest border transition-all">Shop</button>
+                <button @click="locationTab = 'warehouse'" :class="locationTab === 'warehouse' ? 'bg-primary/10 text-primary border-primary/20' : 'bg-surface-container-low text-outline border-outline-variant/20 hover:text-on-surface'" class="px-5 py-2 rounded-lg text-xs font-black uppercase tracking-widest border transition-all">Main Warehouse</button>
+                <button @click="locationTab = 'remote'" :class="locationTab === 'remote' ? 'bg-primary/10 text-primary border-primary/20' : 'bg-surface-container-low text-outline border-outline-variant/20 hover:text-on-surface'" class="px-5 py-2 rounded-lg text-xs font-black uppercase tracking-widest border transition-all">Remote Warehouse</button>
+            </div>
+
             <div class="overflow-x-auto">
                 <table class="w-full text-left border-collapse">
                     <thead>
-                        <tr class="bg-surface-container-low/50 text-[11px] font-bold text-outline uppercase tracking-wider">
-                            <th class="px-6 py-4">Product Info</th>
-                            <th class="px-6 py-4">Shop</th>
-                            <th class="px-6 py-4">Warehouse</th>
-                            <th class="px-6 py-4">Remote</th>
-                            <th class="px-6 py-4">Total</th>
-                            <th class="px-6 py-4">Prices (AED)</th>
-                            <th class="px-6 py-4 text-center">Actions</th>
+                        <tr class="bg-surface-container-low/50 text-lg font-bold text-outline uppercase tracking-wider">
+                            <th class="px-6 py-5">Product Info</th>
+                            <th v-if="locationTab === 'all' || locationTab === 'shop'" class="px-6 py-5">Shop</th>
+                            <th v-if="locationTab === 'all' || locationTab === 'warehouse'" class="px-6 py-5">Warehouse</th>
+                            <th v-if="locationTab === 'all' || locationTab === 'remote'" class="px-6 py-5">Remote</th>
+                            <th class="px-6 py-5">Total</th>
+                            <th class="px-6 py-5">Prices (AED)</th>
+                            <th class="px-6 py-5 text-center">Actions</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-outline-variant/10">
-                        <tr v-for="item in inventory" :key="item.id" class="hover:bg-surface-container-low/30 transition-colors group">
-                            <td class="px-6 py-4">
+                        <tr v-for="item in filteredInventory" :key="item.id" class="hover:bg-surface-container-low/30 transition-colors group">
+                            <td class="px-6 py-6">
                                 <div class="flex flex-col">
-                                    <span class="text-xs font-bold text-on-surface">{{ item.name }}</span>
+                                    <span class="text-xl font-bold text-on-surface">{{ item.name }}</span>
                                     <div class="flex items-center gap-2 mt-0.5">
-                                        <span class="text-[10px] bg-surface-container-high px-1.5 py-0.5 rounded text-outline uppercase">{{ item.sku || 'No SKU' }}</span>
-                                        <span v-if="item.category" class="text-[10px] text-primary font-bold">{{ item.category }}</span>
+                                        <span v-if="item.category" class="text-base text-primary font-bold">{{ item.category }}</span>
                                     </div>
                                 </div>
                             </td>
-                            <td class="px-6 py-4 text-xs font-bold" :class="item.shop_quantity <= 2 ? 'text-error' : 'text-on-surface'">{{ item.shop_quantity }}</td>
-                            <td class="px-6 py-4 text-xs font-bold text-on-surface">{{ item.warehouse_quantity }}</td>
-                            <td class="px-6 py-4 text-xs font-bold text-on-surface">{{ item.remote_quantity }}</td>
-                            <td class="px-6 py-4">
+                            <td v-if="locationTab === 'all' || locationTab === 'shop'" class="px-6 py-6 text-xl font-bold" :class="item.shop_quantity <= 2 ? 'text-error' : 'text-on-surface'">{{ item.shop_quantity }}</td>
+                            <td v-if="locationTab === 'all' || locationTab === 'warehouse'" class="px-6 py-6 text-xl font-bold text-on-surface">{{ item.warehouse_quantity }}</td>
+                            <td v-if="locationTab === 'all' || locationTab === 'remote'" class="px-6 py-6 text-xl font-bold text-on-surface">{{ item.remote_quantity }}</td>
+                            <td class="px-6 py-6">
                                 <div class="flex items-center gap-2">
-                                    <span class="text-xs font-black" :class="item.total_quantity <= item.low_stock_threshold ? 'text-error' : 'text-on-surface'">{{ item.total_quantity }}</span>
-                                    <span v-if="item.total_quantity <= item.low_stock_threshold" class="material-symbols-outlined text-error text-[16px]">priority_high</span>
+                                    <span class="text-xl font-black" :class="item.total_quantity <= item.low_stock_threshold ? 'text-error' : 'text-on-surface'">{{ item.total_quantity }}</span>
+                                    <span v-if="item.total_quantity <= item.low_stock_threshold" class="material-symbols-outlined text-error text-[20px]">priority_high</span>
                                 </div>
                             </td>
-                            <td class="px-6 py-4">
-                                <div class="flex flex-col text-[10px]">
+                            <td class="px-6 py-6">
+                                <div class="flex flex-col text-sm">
                                     <span class="text-outline">Cost: {{ formatCurrency(item.cost_price) }}</span>
                                     <span class="text-primary font-bold">Sell: {{ formatCurrency(item.selling_price) }}</span>
                                 </div>
@@ -222,6 +240,11 @@ const locations = [
                                 </div>
                             </td>
                         </tr>
+                        <tr v-if="filteredInventory.length === 0">
+                            <td colspan="7" class="py-12 text-center text-outline text-xs">
+                                No products found in this location.
+                            </td>
+                        </tr>
                     </tbody>
                 </table>
             </div>
@@ -232,33 +255,33 @@ const locations = [
             <div class="overflow-x-auto">
                 <table class="w-full text-left border-collapse">
                     <thead>
-                        <tr class="bg-surface-container-low/50 text-[11px] font-bold text-outline uppercase tracking-wider">
-                            <th class="px-6 py-4">Date</th>
-                            <th class="px-6 py-4">Product</th>
-                            <th class="px-6 py-4">Type</th>
-                            <th class="px-6 py-4">Quantity</th>
-                            <th class="px-6 py-4">Route</th>
-                            <th class="px-6 py-4">Notes</th>
+                        <tr class="bg-surface-container-low/50 text-lg font-bold text-outline uppercase tracking-wider">
+                            <th class="px-6 py-5">Date</th>
+                            <th class="px-6 py-5">Product</th>
+                            <th class="px-6 py-5">Type</th>
+                            <th class="px-6 py-5">Quantity</th>
+                            <th class="px-6 py-5">Route</th>
+                            <th class="px-6 py-5">Notes</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-outline-variant/10">
-                        <tr v-for="move in movements" :key="move.id" class="text-xs">
-                            <td class="px-6 py-4 text-outline">{{ new Date(move.created_at).toLocaleString() }}</td>
-                            <td class="px-6 py-4 font-bold">{{ move.inventory.name }}</td>
-                            <td class="px-6 py-4">
-                                <Badge :variant="move.type === 'in' ? 'success' : (move.type === 'transfer' ? 'warning' : 'error')">
+                        <tr v-for="move in movements" :key="move.id" class="text-lg hover:bg-surface-container-low/30 transition-colors">
+                            <td class="px-6 py-5 text-outline">{{ new Date(move.created_at).toLocaleString() }}</td>
+                            <td class="px-6 py-5 font-bold">{{ move.inventory?.name || 'Unknown' }}</td>
+                            <td class="px-6 py-5">
+                                <Badge :variant="move.type === 'in' ? 'success' : (move.type === 'transfer' ? 'warning' : 'error')" class="text-base px-3 py-1.5">
                                     {{ move.type.toUpperCase() }}
                                 </Badge>
                             </td>
-                            <td class="px-6 py-4 font-black">{{ move.quantity }}</td>
-                            <td class="px-6 py-4">
-                                <div class="flex items-center gap-1 text-[10px]">
+                            <td class="px-6 py-5 font-black text-xl">{{ move.quantity }}</td>
+                            <td class="px-6 py-5">
+                                <div class="flex items-center gap-1 text-base">
                                     <span class="capitalize">{{ move.from_location || '-' }}</span>
-                                    <span v-if="move.to_location" class="material-symbols-outlined text-[12px]">arrow_forward</span>
+                                    <span v-if="move.to_location" class="material-symbols-outlined text-[16px]">arrow_forward</span>
                                     <span class="capitalize">{{ move.to_location || '' }}</span>
                                 </div>
                             </td>
-                            <td class="px-6 py-4 text-outline">{{ move.notes }}</td>
+                            <td class="px-6 py-5 text-outline">{{ move.notes }}</td>
                         </tr>
                     </tbody>
                 </table>
@@ -271,14 +294,9 @@ const locations = [
                 <FormField label="Product Name" :error="form.errors.name" required>
                     <TextInput v-model="form.name" placeholder="Item Name" />
                 </FormField>
-                <div class="grid grid-cols-2 gap-4">
-                    <FormField label="Category" :error="form.errors.category">
-                        <TextInput v-model="form.category" placeholder="Electronics" />
-                    </FormField>
-                    <FormField label="SKU" :error="form.errors.sku">
-                        <TextInput v-model="form.sku" placeholder="SKU-000" />
-                    </FormField>
-                </div>
+                <FormField label="Category" :error="form.errors.category">
+                    <TextInput v-model="form.category" placeholder="Electronics" />
+                </FormField>
                 <div class="grid grid-cols-2 gap-4">
                     <FormField label="Cost Price (AED)" :error="form.errors.cost_price">
                         <TextInput v-model="form.cost_price" type="number" step="0.01" />

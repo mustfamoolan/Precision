@@ -173,19 +173,19 @@ const exportPDF = async () => {
                     <div class="p-0 overflow-x-auto">
                         <table class="w-full text-left">
                             <thead>
-                                <tr class="bg-surface-container-low/30 text-[10px] font-bold text-outline uppercase tracking-widest border-b border-outline-variant/20">
-                                    <th class="py-3 px-6">Product Description</th>
-                                    <th class="py-3 px-6">Qty</th>
-                                    <th class="py-3 px-6">Type</th>
-                                    <th class="py-3 px-6 text-right">Actions</th>
+                                <tr class="bg-surface-container-low/30 text-lg font-bold text-outline uppercase tracking-widest border-b border-outline-variant/20">
+                                    <th class="py-5 px-6">Product Description</th>
+                                    <th class="py-5 px-6">Qty</th>
+                                    <th class="py-5 px-6">Type</th>
+                                    <th class="py-5 px-6 text-right">Actions</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-outline-variant/10">
                                 <tr v-for="item in shipment.items" :key="item.id" class="hover:bg-surface-container-low/30 transition-colors">
-                                    <td class="py-4 px-6 text-sm font-bold text-on-surface">{{ item.product_name }}</td>
-                                    <td class="py-4 px-6 text-xs font-black text-on-surface">{{ item.quantity }}</td>
-                                    <td class="py-4 px-6">
-                                        <span class="px-2 py-0.5 rounded bg-surface-container-low text-[10px] font-bold text-outline uppercase">{{ item.type || 'N/A' }}</span>
+                                    <td class="py-6 px-6 text-xl font-bold text-on-surface">{{ item.product_name }}</td>
+                                    <td class="py-6 px-6 text-2xl font-black text-on-surface">{{ item.quantity }}</td>
+                                    <td class="py-6 px-6">
+                                        <span class="px-4 py-1.5 rounded bg-surface-container-low text-sm font-bold text-outline uppercase">{{ item.type || 'N/A' }}</span>
                                     </td>
                                     <td class="py-4 px-6 text-right">
                                         <button @click="deleteItem(item.id)" class="text-outline hover:text-error transition-colors">
@@ -220,18 +220,18 @@ const exportPDF = async () => {
                     <div class="p-0 overflow-x-auto">
                         <table class="w-full text-left">
                             <thead>
-                                <tr class="bg-surface-container-low/30 text-[10px] font-bold text-outline uppercase tracking-widest border-b border-outline-variant/20">
-                                    <th class="py-3 px-6">Date</th>
-                                    <th class="py-3 px-6">Amount</th>
-                                    <th class="py-3 px-6">Method</th>
-                                    <th class="py-3 px-6 text-right">Actions</th>
+                                <tr class="bg-surface-container-low/30 text-lg font-bold text-outline uppercase tracking-widest border-b border-outline-variant/20">
+                                    <th class="py-5 px-6">Date</th>
+                                    <th class="py-5 px-6">Amount</th>
+                                    <th class="py-5 px-6">Method</th>
+                                    <th class="py-5 px-6 text-right">Actions</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-outline-variant/10">
                                 <tr v-for="pay in shipment.payments" :key="pay.id" class="hover:bg-surface-container-low/30 transition-colors">
-                                    <td class="py-4 px-6 text-xs font-bold text-on-surface-variant">{{ fmtDate(pay.payment_date) }}</td>
-                                    <td class="py-4 px-6 text-sm font-black text-emerald-600">{{ formatCurrency(pay.amount) }}</td>
-                                    <td class="py-4 px-6 text-[10px] font-bold text-outline uppercase">{{ pay.payment_method }}</td>
+                                    <td class="py-6 px-6 text-xl font-bold text-on-surface-variant">{{ fmtDate(pay.payment_date) }}</td>
+                                    <td class="py-6 px-6 text-2xl font-black text-emerald-600">{{ formatCurrency(pay.amount) }}</td>
+                                    <td class="py-6 px-6 text-sm font-bold text-outline uppercase">{{ pay.payment_method }}</td>
                                     <td class="py-4 px-6 text-right">
                                         <button @click="deletePayment(pay.id)" class="text-outline hover:text-error transition-colors">
                                             <span class="material-symbols-outlined text-[18px]">delete</span>

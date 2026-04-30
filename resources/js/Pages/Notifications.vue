@@ -160,26 +160,26 @@ const groups = computed(() => {
 
                             <!-- Content -->
                             <div class="flex-1 min-w-0 pr-10">
-                                <div class="flex justify-between items-start mb-1 gap-4">
-                                    <h4 class="font-headline font-black text-on-surface text-lg leading-tight truncate group-hover:text-primary transition-colors">{{ n.data.title }}</h4>
-                                    <span class="font-label text-[10px] text-outline font-black uppercase tracking-widest shrink-0">{{ formatTime(n.created_at) }}</span>
+                                <div class="flex justify-between items-start mb-2 gap-4">
+                                    <h4 class="font-headline font-black text-on-surface text-2xl leading-tight truncate group-hover:text-primary transition-colors">{{ n.data.title }}</h4>
+                                    <span class="font-label text-xs text-outline font-black uppercase tracking-widest shrink-0">{{ formatTime(n.created_at) }}</span>
                                 </div>
-                                <p class="font-body text-sm text-on-surface-variant mb-4 leading-relaxed line-clamp-2 pr-12">{{ n.data.message }}</p>
+                                <p class="font-body text-lg text-on-surface-variant mb-6 leading-relaxed line-clamp-2 pr-12">{{ n.data.message }}</p>
                                 
-                                <div class="flex items-center gap-4">
+                                <div class="flex items-center gap-6">
                                     <button 
                                         v-if="!n.read_at"
                                         @click="markAsRead(n.id)" 
-                                        class="px-4 py-1.5 rounded-lg bg-surface-container-high text-on-surface text-[9px] font-black uppercase tracking-widest hover:bg-primary hover:text-on-primary transition-all shadow-sm"
+                                        class="px-5 py-2.5 rounded-lg bg-surface-container-high text-on-surface text-xs font-black uppercase tracking-widest hover:bg-primary hover:text-on-primary transition-all shadow-sm"
                                     >
                                         Mark as read
                                     </button>
                                     <Link 
                                         v-if="n.data.link" 
                                         :href="n.data.link" 
-                                        class="px-4 py-1.5 rounded-lg border border-outline-variant/30 text-outline text-[9px] font-black uppercase tracking-widest hover:border-primary hover:text-primary transition-all flex items-center gap-1"
+                                        class="px-5 py-2.5 rounded-lg border border-outline-variant/30 text-outline text-xs font-black uppercase tracking-widest hover:border-primary hover:text-primary transition-all flex items-center gap-1"
                                     >
-                                        Action Required <span class="material-symbols-outlined text-[12px]">arrow_forward</span>
+                                        Action Required <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
                                     </Link>
                                 </div>
                             </div>
@@ -220,26 +220,26 @@ const groups = computed(() => {
 
                             <!-- Content -->
                             <div class="flex-1 min-w-0 pr-10">
-                                <div class="flex justify-between items-start mb-1 gap-4">
-                                    <h4 class="font-headline font-bold text-on-surface text-lg leading-tight truncate">{{ n.data.title }}</h4>
-                                    <span class="font-label text-[10px] text-outline font-black uppercase tracking-widest shrink-0">{{ formatTime(n.created_at) }}</span>
+                                <div class="flex justify-between items-start mb-2 gap-4">
+                                    <h4 class="font-headline font-bold text-on-surface text-2xl leading-tight truncate">{{ n.data.title }}</h4>
+                                    <span class="font-label text-xs text-outline font-black uppercase tracking-widest shrink-0">{{ formatTime(n.created_at) }}</span>
                                 </div>
-                                <p class="font-body text-sm text-on-surface-variant mb-4 leading-relaxed line-clamp-2 pr-12">{{ n.data.message }}</p>
+                                <p class="font-body text-lg text-on-surface-variant mb-6 leading-relaxed line-clamp-2 pr-12">{{ n.data.message }}</p>
                                 
-                                <div class="flex items-center gap-4">
+                                <div class="flex items-center gap-6">
                                     <button 
                                         v-if="!n.read_at"
                                         @click="markAsRead(n.id)" 
-                                        class="px-4 py-1.5 rounded-lg bg-surface-container-high text-on-surface text-[9px] font-black uppercase tracking-widest hover:bg-primary hover:text-on-primary transition-all shadow-sm"
+                                        class="px-5 py-2.5 rounded-lg bg-surface-container-high text-on-surface text-xs font-black uppercase tracking-widest hover:bg-primary hover:text-on-primary transition-all shadow-sm"
                                     >
                                         Mark as read
                                     </button>
                                     <Link 
                                         v-if="n.data.link" 
                                         :href="n.data.link" 
-                                        class="px-4 py-1.5 rounded-lg border border-outline-variant/30 text-outline text-[9px] font-black uppercase tracking-widest hover:border-primary hover:text-primary transition-all flex items-center gap-1"
+                                        class="px-5 py-2.5 rounded-lg border border-outline-variant/30 text-outline text-xs font-black uppercase tracking-widest hover:border-primary hover:text-primary transition-all flex items-center gap-1"
                                     >
-                                        Review <span class="material-symbols-outlined text-[12px]">open_in_new</span>
+                                        Review <span class="material-symbols-outlined text-[16px]">open_in_new</span>
                                     </Link>
                                 </div>
                             </div>

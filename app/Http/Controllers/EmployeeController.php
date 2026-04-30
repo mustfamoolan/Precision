@@ -12,6 +12,7 @@ class EmployeeController extends Controller
     {
         return Inertia::render('Employees', [
             'employees' => Employee::all(['id', 'name']),
+            'customers' => \App\Models\Customer::all(['id', 'name']),
         ]);
     }
 

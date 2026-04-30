@@ -37,6 +37,10 @@ class SaleController extends Controller
             });
         }
 
+        if ($request->filled('status') && $request->status !== 'all') {
+            $query->where('status', $request->status);
+        }
+
         $sales = $query->latest('date')->get();
         
         // Summary Data for the current view
@@ -56,6 +60,8 @@ class SaleController extends Controller
             ],
             'filters' => $request->all(['filter', 'search', 'start_date', 'end_date', 'type']),
             'banks' => Bank::all(['id', 'name']),
+            'customers' => \App\Models\Customer::all(['id', 'name']),
+            'local_invoices' => Sale::where('type', 'local')->get(['id', 'invoice_number']),
         ]);
     }
 
@@ -86,6 +92,61 @@ class SaleController extends Controller
         }
 
         Sale::create($validated);
+
+        return redirect()->back();
+    }
+
+    public function update(Request $request, Sale $sale)
+    {
+        $validated = $request->validate([
+            'date' => 'required|date',
+            'invoice_number' => 'required|string',
+            'customer_name' => 'required|string',
+            'amount' => 'required|numeric',
+            'type' => 'required|string|in:local,export',
+            'items_count' => 'nullable|integer',
+            'paid_amount' => 'nullable|numeric',
+            'container_number' => 'nullable|string',
+            'shipping_status' => 'nullable|string',
+            'bank_id' => 'nullable|exists:banks,id',
+        ]);
+
+        $validated['paid_amount'] = $validated['paid_amount'] ?? 0;
+        $validated['due_amount'] = $validated['amount'] - $validated['paid_amount'];
+        
+        if ($validated['due_amount'] <= 0) {
+            $validated['status'] = 'paid';
+        } elseif ($validated['paid_amount'] > 0) {
+            $validated['status'] = 'partial';
+        } else {
+            $validated['status'] = 'pending';
+        }
+
+        $sale->update($validated);
+
+        return redirect()->back();
+    }
+
+    public function storePayment(Request $request, Sale $sale)
+    {
+        $request->validate([
+            'payment_amount' => 'required|numeric|min:0.01'
+        ]);
+
+        $sale->paid_amount += $request->payment_amount;
+        $sale->due_amount = $sale->amount - $sale->paid_amount;
+
+        if ($sale->due_amount <= 0) {
+            $sale->status = 'paid';
+            $sale->due_amount = 0; // Prevent negative due
+            $sale->paid_amount = $sale->amount; // Cap paid amount
+        } elseif ($sale->paid_amount > 0) {
+            $sale->status = 'partial';
+        } else {
+            $sale->status = 'pending';
+        }
+
+        $sale->save();
 
         return redirect()->back();
     }

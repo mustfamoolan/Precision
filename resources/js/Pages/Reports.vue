@@ -333,34 +333,34 @@ const exportPDF = async () => {
             <div class="overflow-x-auto">
                 <table class="w-full text-left">
                     <thead>
-                        <tr class="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
-                            <th class="py-5 px-8">Date</th>
-                            <th class="py-5 px-8">Transaction Name</th>
-                            <th class="py-5 px-8">Type</th>
-                            <th class="py-5 px-8">Total</th>
-                            <th class="py-5 px-8">Paid</th>
-                            <th class="py-5 px-8 text-right">Due</th>
+                        <tr class="bg-slate-50 text-lg font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
+                            <th class="py-6 px-8">Date</th>
+                            <th class="py-6 px-8">Transaction Name</th>
+                            <th class="py-6 px-8">Type</th>
+                            <th class="py-6 px-8">Total</th>
+                            <th class="py-6 px-8">Paid</th>
+                            <th class="py-6 px-8 text-right">Due</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-50">
                         <tr v-for="item in paginatedLedger" :key="item.id + item.type"
                             class="group hover:bg-slate-50/50 transition-colors"
                         >
-                            <td class="py-5 px-8 text-sm font-bold text-slate-900 whitespace-nowrap">{{ fmtDate(item.date) }}</td>
-                            <td class="py-5 px-8">
-                                <div class="text-sm font-bold text-slate-900">{{ item.name }}</div>
+                            <td class="py-6 px-8 text-xl font-bold text-slate-900 whitespace-nowrap">{{ fmtDate(item.date) }}</td>
+                            <td class="py-6 px-8">
+                                <div class="text-xl font-bold text-slate-900">{{ item.name }}</div>
                             </td>
-                            <td class="py-5 px-8">
+                            <td class="py-6 px-8">
                                 <span
-                                    class="inline-block px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest"
+                                    class="inline-block px-4 py-1.5 rounded-full text-sm font-black uppercase tracking-widest"
                                     :class="item.type === 'sale'
                                         ? 'bg-emerald-50 text-emerald-600'
                                         : 'bg-rose-50 text-rose-600'"
                                 >{{ item.type }}</span>
                             </td>
-                            <td class="py-5 px-8 font-black text-slate-900 whitespace-nowrap">{{ fmt(item.amount) }}</td>
-                            <td class="py-5 px-8 font-bold text-emerald-600 whitespace-nowrap">{{ fmt(item.paid_amount) }}</td>
-                            <td class="py-5 px-8 text-right font-bold whitespace-nowrap"
+                            <td class="py-6 px-8 font-black text-slate-900 whitespace-nowrap text-2xl">{{ fmt(item.amount) }}</td>
+                            <td class="py-6 px-8 font-bold text-emerald-600 whitespace-nowrap text-2xl">{{ fmt(item.paid_amount) }}</td>
+                            <td class="py-6 px-8 text-right font-bold whitespace-nowrap text-2xl"
                                 :class="item.due_amount > 0 ? 'text-rose-600' : 'text-slate-300'"
                             >{{ fmt(item.due_amount) }}</td>
                         </tr>

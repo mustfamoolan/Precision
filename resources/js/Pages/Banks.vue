@@ -323,27 +323,27 @@ const isDueSoon = (dueDate) => {
                         <div class="overflow-x-auto">
                             <table class="w-full text-left">
                                 <thead class="sticky top-0 z-10">
-                                    <tr class="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
-                                        <th class="py-5 px-8">Date</th>
-                                        <th class="py-5 px-8">Description</th>
-                                        <th class="py-5 px-8">Amount</th>
-                                        <th class="py-5 px-8 text-right">Destination</th>
+                                    <tr class="bg-slate-50 text-lg font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
+                                        <th class="py-6 px-8">Date</th>
+                                        <th class="py-6 px-8">Description</th>
+                                        <th class="py-6 px-8">Amount</th>
+                                        <th class="py-6 px-8 text-right">Destination</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-slate-50">
                                     <tr v-for="tx in paginatedTransactions" :key="tx.id" class="group hover:bg-slate-50/50 transition-colors">
-                                        <td class="py-5 px-8 text-sm font-bold text-slate-900 whitespace-nowrap">{{ formatDate(tx.date) }}</td>
-                                        <td class="py-5 px-8">
-                                            <div class="text-sm font-black text-slate-900">{{ tx.description }}</div>
-                                            <div class="text-[9px] font-black text-indigo-500 uppercase tracking-widest mt-1">{{ tx.reference_type }}</div>
+                                        <td class="py-6 px-8 text-xl font-bold text-slate-900 whitespace-nowrap">{{ formatDate(tx.date) }}</td>
+                                        <td class="py-6 px-8">
+                                            <div class="text-xl font-black text-slate-900">{{ tx.description }}</div>
+                                            <div class="text-base font-black text-indigo-500 uppercase tracking-widest mt-1">{{ tx.reference_type }}</div>
                                         </td>
-                                        <td class="py-5 px-8 whitespace-nowrap">
-                                            <div :class="tx.type === 'deposit' ? 'text-emerald-600' : 'text-rose-600'" class="text-base font-black">
+                                        <td class="py-6 px-8 whitespace-nowrap">
+                                            <div :class="tx.type === 'deposit' ? 'text-emerald-600' : 'text-rose-600'" class="text-2xl font-black">
                                                 {{ tx.type === 'deposit' ? '+' : '-' }} {{ formatPrice(tx.amount) }}
                                             </div>
                                         </td>
-                                        <td class="py-5 px-8 text-right">
-                                            <span class="inline-block px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border"
+                                        <td class="py-6 px-8 text-right">
+                                            <span class="inline-block px-5 py-2 rounded-full text-base font-black uppercase tracking-widest border"
                                                 :class="{
                                                     'bg-indigo-50 text-indigo-600 border-indigo-100': tx.bank?.name === 'Bank 1',
                                                     'bg-violet-50 text-violet-600 border-violet-100': tx.bank?.name === 'Bank 2',
@@ -408,33 +408,33 @@ const isDueSoon = (dueDate) => {
                         <div class="overflow-x-auto">
                             <table class="w-full text-left">
                                 <thead class="sticky top-0 z-10">
-                                    <tr class="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
-                                        <th class="py-5 px-8">Party Name</th>
-                                        <th class="py-5 px-8">Cheque #</th>
-                                        <th class="py-5 px-8">Amount</th>
-                                        <th class="py-5 px-8">Status</th>
-                                        <th class="py-5 px-8 text-right">Due Date</th>
+                                    <tr class="bg-slate-50 text-lg font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
+                                        <th class="py-6 px-8">Party Name</th>
+                                        <th class="py-6 px-8">Cheque #</th>
+                                        <th class="py-6 px-8">Amount</th>
+                                        <th class="py-6 px-8">Status</th>
+                                        <th class="py-6 px-8 text-right">Due Date</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-slate-50">
                                     <tr v-for="cheque in paginatedCheques" :key="cheque.id" class="group hover:bg-slate-50/50 transition-colors">
-                                        <td class="py-5 px-8 text-sm font-bold text-slate-600">{{ cheque.party_name }}</td>
-                                        <td class="py-5 px-8 text-sm font-black text-slate-900">#{{ cheque.cheque_number }}</td>
-                                        <td class="py-5 px-8 text-base font-black text-slate-900 whitespace-nowrap">{{ formatPrice(cheque.amount) }}</td>
-                                        <td class="py-5 px-8">
-                                            <div class="flex items-center gap-3">
-                                                <span class="px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest"
+                                        <td class="py-6 px-8 text-xl font-bold text-slate-600">{{ cheque.party_name }}</td>
+                                        <td class="py-6 px-8 text-xl font-black text-slate-900">#{{ cheque.cheque_number }}</td>
+                                        <td class="py-6 px-8 text-2xl font-black text-slate-900 whitespace-nowrap">{{ formatPrice(cheque.amount) }}</td>
+                                        <td class="py-6 px-8">
+                                            <div class="flex items-center gap-4">
+                                                <span class="px-4 py-2 rounded-full text-base font-black uppercase tracking-widest"
                                                     :class="cheque.status === 'received' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'"
                                                 >{{ cheque.status === 'received' ? 'Received' : 'Pending' }}</span>
                                                 <button v-if="cheque.status === 'pending'" @click="openReceiveModal(cheque)"
-                                                    class="px-4 py-2 bg-indigo-50 text-indigo-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-100 transition-all active:scale-95"
+                                                    class="px-5 py-2.5 bg-indigo-50 text-indigo-600 rounded-xl text-sm font-black uppercase tracking-widest hover:bg-indigo-100 transition-all active:scale-95"
                                                 >Receive</button>
                                             </div>
                                         </td>
-                                        <td class="py-5 px-8 text-right">
-                                            <div class="flex items-center justify-end gap-2 text-sm font-bold text-slate-600 whitespace-nowrap">
+                                        <td class="py-6 px-8 text-right">
+                                            <div class="flex items-center justify-end gap-2 text-xl font-bold text-slate-600 whitespace-nowrap">
                                                 {{ formatDate(cheque.due_date) }}
-                                                <span v-if="cheque.status === 'pending' && isDueSoon(cheque.due_date)" class="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
+                                                <span v-if="cheque.status === 'pending' && isDueSoon(cheque.due_date)" class="w-3 h-3 rounded-full bg-rose-500 animate-pulse"></span>
                                             </div>
                                         </td>
                                     </tr>
@@ -472,23 +472,23 @@ const isDueSoon = (dueDate) => {
                         <div class="overflow-x-auto">
                             <table class="w-full text-left">
                                 <thead class="sticky top-0 z-10">
-                                    <tr class="bg-white text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
-                                        <th class="py-5 px-8">Date</th>
-                                        <th class="py-5 px-8">Description</th>
-                                        <th class="py-5 px-8">Type</th>
-                                        <th class="py-5 px-8 text-right">Amount</th>
+                                    <tr class="bg-white text-lg font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
+                                        <th class="py-6 px-8">Date</th>
+                                        <th class="py-6 px-8">Description</th>
+                                        <th class="py-6 px-8">Type</th>
+                                        <th class="py-6 px-8 text-right">Amount</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-slate-50">
                                     <tr v-for="tx in paginatedCashLog" :key="tx.id" class="hover:bg-white transition-colors">
-                                        <td class="py-5 px-8 text-sm font-bold text-slate-900 whitespace-nowrap">{{ formatDate(tx.date) }}</td>
-                                        <td class="py-5 px-8 text-sm font-medium text-slate-600">{{ tx.description }}</td>
-                                        <td class="py-5 px-8">
-                                            <span class="px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest"
+                                        <td class="py-6 px-8 text-xl font-bold text-slate-900 whitespace-nowrap">{{ formatDate(tx.date) }}</td>
+                                        <td class="py-6 px-8 text-xl font-medium text-slate-600">{{ tx.description }}</td>
+                                        <td class="py-6 px-8">
+                                            <span class="px-4 py-1.5 rounded-full text-base font-black uppercase tracking-widest"
                                                 :class="tx.type === 'deposit' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'"
                                             >{{ tx.type }}</span>
                                         </td>
-                                        <td class="py-5 px-8 text-right font-black whitespace-nowrap" :class="tx.type === 'deposit' ? 'text-emerald-600' : 'text-rose-600'">
+                                        <td class="py-6 px-8 text-right font-black whitespace-nowrap text-2xl" :class="tx.type === 'deposit' ? 'text-emerald-600' : 'text-rose-600'">
                                             {{ tx.type === 'deposit' ? '+' : '-' }} {{ formatPrice(tx.amount) }}
                                         </td>
                                     </tr>

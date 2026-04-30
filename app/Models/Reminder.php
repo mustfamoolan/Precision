@@ -10,6 +10,7 @@ class Reminder extends Model
         'date',
         'item',
         'quantity',
+        'unit',
         'notes',
         'status',
     ];

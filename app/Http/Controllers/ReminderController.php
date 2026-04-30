@@ -22,6 +22,7 @@ class ReminderController extends Controller
             'date' => 'required|date',
             'item' => 'required|string|max:255',
             'quantity' => 'nullable|string|max:255',
+            'unit' => 'nullable|string|max:255',
             'notes' => 'nullable|string',
             'status' => 'required|in:pending,in_progress,done',
         ]);
@@ -38,6 +39,7 @@ class ReminderController extends Controller
             'date' => 'sometimes|required|date',
             'item' => 'sometimes|required|string|max:255',
             'quantity' => 'nullable|max:255',
+            'unit' => 'nullable|string|max:255',
             'notes' => 'nullable|string',
             'status' => 'required|in:pending,in_progress,done',
         ]);

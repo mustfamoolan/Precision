@@ -115,32 +115,32 @@ const doSearch = () => router.get('/shipping', { search: search.value, status: s
             <div class="overflow-x-auto">
                 <table class="w-full text-left">
                     <thead>
-                        <tr class="bg-surface-container-low/30 text-[10px] font-bold text-outline uppercase tracking-widest border-b border-outline-variant/20">
-                            <th class="py-4 px-6">Container / Vessel</th>
-                            <th class="py-4 px-6">Supplier</th>
-                            <th class="py-4 px-6">ETA</th>
-                            <th class="py-4 px-6">Status</th>
-                            <th class="py-4 px-6">Balance Due</th>
-                            <th class="py-4 px-6 text-right">Actions</th>
+                        <tr class="bg-surface-container-low/30 text-lg font-bold text-outline uppercase tracking-widest border-b border-outline-variant/20">
+                            <th class="py-6 px-6">Container / Vessel</th>
+                            <th class="py-6 px-6">Supplier</th>
+                            <th class="py-6 px-6">ETA</th>
+                            <th class="py-6 px-6">Status</th>
+                            <th class="py-6 px-6">Balance Due</th>
+                            <th class="py-6 px-6 text-right">Actions</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-outline-variant/10">
                         <tr v-for="s in shipments" :key="s.id" class="group hover:bg-surface-container-low/50 transition-colors">
-                            <td class="py-4 px-6">
+                            <td class="py-6 px-6">
                                 <Link :href="`/shipping/${s.id}`" class="block group/link">
-                                    <p class="text-sm font-bold text-on-surface group-hover/link:text-primary transition-colors">{{ s.container_number }}</p>
-                                    <p class="text-[10px] text-outline font-medium">{{ s.vessel_name || 'No Vessel' }}</p>
+                                    <p class="text-xl font-bold text-on-surface group-hover/link:text-primary transition-colors">{{ s.container_number }}</p>
+                                    <p class="text-base text-outline font-medium">{{ s.vessel_name || 'No Vessel' }}</p>
                                 </Link>
                             </td>
-                            <td class="py-4 px-6 text-xs font-medium text-on-surface-variant">{{ s.supplier_name || '—' }}</td>
-                            <td class="py-4 px-6 text-xs font-bold text-on-surface-variant">{{ fmtDate(s.arrival_date) }}</td>
-                            <td class="py-4 px-6">
-                                <span class="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest" :class="getStatusColor(s.status)">
+                            <td class="py-6 px-6 text-lg font-medium text-on-surface-variant">{{ s.supplier_name || '—' }}</td>
+                            <td class="py-6 px-6 text-lg font-bold text-on-surface-variant">{{ fmtDate(s.arrival_date) }}</td>
+                            <td class="py-6 px-6">
+                                <span class="px-5 py-2 rounded-full text-sm font-black uppercase tracking-widest" :class="getStatusColor(s.status)">
                                     {{ s.status }}
                                 </span>
                             </td>
-                            <td class="py-4 px-6">
-                                <p class="text-sm font-black" :class="s.balance_due > 0 ? 'text-error' : 'text-emerald-600'">
+                            <td class="py-6 px-6">
+                                <p class="text-2xl font-black" :class="s.balance_due > 0 ? 'text-error' : 'text-emerald-600'">
                                     {{ formatCurrency(s.balance_due) }}
                                 </p>
                             </td>
