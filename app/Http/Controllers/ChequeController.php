@@ -28,6 +28,7 @@ class ChequeController extends Controller
             'party_name' => 'required|string',
             'amount' => 'required|numeric|min:0.01',
             'due_date' => 'required|date',
+            'type' => 'required|in:incoming,outgoing',
         ]);
 
         $validated['status'] = 'pending';
@@ -52,7 +53,7 @@ class ChequeController extends Controller
 
         return DB::transaction(function () use ($validated, $cheque) {
             $cheque->update([
-                'status' => 'collected',
+                'status' => 'received',
                 'bank_id' => $validated['bank_id']
             ]);
 
@@ -69,7 +70,7 @@ class ChequeController extends Controller
                 'date' => now()->toDateString(),
             ]);
 
-            return redirect()->back()->with('success', 'Cheque collected into ' . $bank->name);
+            return redirect()->back()->with('success', 'Cheque received into ' . $bank->name);
         });
     }
 

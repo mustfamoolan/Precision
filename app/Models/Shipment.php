@@ -18,11 +18,24 @@ class Shipment extends Model
         'import_tax',
         'clearance_fees',
         'other_costs',
-        'notes'
+        'notes',
+        'supplier_name',
+        'invoice_amount',
+        'paid_amount',
     ];
 
     public function sales()
     {
         return $this->hasMany(Sale::class);
+    }
+
+    public function items()
+    {
+        return $this->hasMany(ShipmentItem::class);
+    }
+
+    public function payments()
+    {
+        return $this->hasMany(ShipmentPayment::class);
     }
 }

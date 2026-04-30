@@ -41,13 +41,22 @@ Route::middleware('auth')->group(function () {
     Route::delete('/reminders/{reminder}', [\App\Http\Controllers\ReminderController::class, 'destroy']);
     Route::get('/shipping', [\App\Http\Controllers\ShippingToolController::class, 'index'])->name('shipping');
     Route::post('/shipping', [\App\Http\Controllers\ShippingToolController::class, 'store']);
+    Route::get('/shipping/{shipment}', [\App\Http\Controllers\ShippingToolController::class, 'show'])->name('shipping.show');
     Route::put('/shipping/{shipment}', [\App\Http\Controllers\ShippingToolController::class, 'update']);
     Route::delete('/shipping/{shipment}', [\App\Http\Controllers\ShippingToolController::class, 'destroy']);
+    
+    Route::post('/shipping/{shipment}/items', [\App\Http\Controllers\ShippingToolController::class, 'storeItem']);
+    Route::delete('/shipping/items/{item}', [\App\Http\Controllers\ShippingToolController::class, 'deleteItem']);
+    
+    Route::post('/shipping/{shipment}/payments', [\App\Http\Controllers\ShippingToolController::class, 'storePayment']);
+    Route::delete('/shipping/payments/{payment}', [\App\Http\Controllers\ShippingToolController::class, 'deletePayment']);
 
     Route::get('/notifications', [\App\Http\Controllers\NotificationController::class, 'index'])->name('notifications');
     Route::get('/api/notifications/unread', [\App\Http\Controllers\NotificationController::class, 'unread']);
     Route::post('/notifications/{id}/read', [\App\Http\Controllers\NotificationController::class, 'markAsRead']);
     Route::post('/notifications/read-all', [\App\Http\Controllers\NotificationController::class, 'markAllAsRead']);
+    Route::post('/notifications/clear-all', [\App\Http\Controllers\NotificationController::class, 'clearAll']);
+    Route::delete('/notifications/{id}', [\App\Http\Controllers\NotificationController::class, 'destroy']);
     
     Route::get('/reports', [\App\Http\Controllers\ReportController::class, 'index'])->name('reports');
     Route::get('/export/sales', [\App\Http\Controllers\ExportController::class, 'sales'])->name('export.sales');

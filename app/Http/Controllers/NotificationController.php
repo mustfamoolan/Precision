@@ -10,25 +10,32 @@ use Illuminate\Support\Facades\Cache;
 
 class NotificationController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $notifications = Auth::user()->notifications()->latest()->paginate(20);
+        $tab = $request->query('tab', 'all');
+        $query = Auth::user()->notifications();
+
+        if ($tab === 'unread') {
+            $query->whereNull('read_at');
+        } elseif (in_array($tab, ['reminder', 'financial', 'shipping'])) {
+            $query->where('data->type', $tab);
+        }
+
+        $notifications = $query->latest()->paginate(20)->withQueryString();
         
         return Inertia::render('Notifications', [
-            'notifications' => $notifications
+            'notifications' => $notifications,
+            'filters' => ['tab' => $tab]
         ]);
     }
 
-    /**
-     * Get unread notifications and count for polling.
-     */
     public function unread()
     {
         $user = Auth::user();
 
-        // Passive background trigger for alerts, throttled to once every 5 mins
         if (!Cache::has('last_reminder_check')) {
             Artisan::call('app:check-reminders');
+            Artisan::call('app:check-events');
             Cache::put('last_reminder_check', true, now()->addMinutes(5));
         }
 
@@ -49,6 +56,30 @@ class NotificationController extends Controller
     public function markAllAsRead()
     {
         Auth::user()->unreadNotifications->markAsRead();
+        return back();
+    }
+
+    public function clearAll(Request $request)
+    {
+        $tab = $request->query('tab', 'all');
+        $query = Auth::user()->notifications();
+
+        if ($tab === 'unread') {
+            $query->whereNull('read_at');
+        } elseif (in_array($tab, ['reminder', 'financial', 'shipping'])) {
+            $query->where('data->type', $tab);
+        }
+
+        $query->delete();
+        
+        return back();
+    }
+
+    public function destroy($id)
+    {
+        $notification = Auth::user()->notifications()->findOrFail($id);
+        $notification->delete();
+        
         return back();
     }
 }
