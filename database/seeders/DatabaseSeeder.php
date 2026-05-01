@@ -3,8 +3,9 @@
 namespace Database\Seeders;
 
 use App\Models\User;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
+use App\Models\Bank;
 use Illuminate\Database\Seeder;
+use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 
 class DatabaseSeeder extends Seeder
 {
@@ -15,12 +16,22 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // User::factory(10)->create();
+        // Default Admin User
+        User::firstOrCreate(
+            ['email' => 'admin@admin.com'],
+            [
+                'name' => 'Admin',
+                'password' => bcrypt('12345678'),
+            ]
+        );
 
-        User::factory()->create([
-            'name' => 'Admin',
-            'email' => 'admin@admin.com',
-            'password' => bcrypt('12345678'),
-        ]);
+        // Default Bank Accounts
+        $banks = ['Bank 1', 'Bank 2', 'Cash'];
+        foreach ($banks as $bankName) {
+            Bank::firstOrCreate(
+                ['name' => $bankName],
+                ['balance' => 0]
+            );
+        }
     }
 }
