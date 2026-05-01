@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import MainLayout from '@/Layouts/MainLayout.vue';
 import { Head, useForm, router } from '@inertiajs/vue3';
 import SideModal from '@/Components/SideModal.vue';
@@ -14,18 +14,26 @@ defineOptions({ layout: MainLayout });
 
 const props = defineProps({
     inventory: Array,
+    brands: Array,
+    customers: Array,
     summary: Object,
     movements: Array,
 });
 
-const showAddModal = ref(false);
-const showTransferModal = ref(false);
-const selectedItem = ref(null);
 const activeTab = ref('inventory'); // 'inventory' or 'history'
+const viewMode = ref('brands'); // 'brands' or 'products'
+const selectedBrandId = ref(null);
 const locationTab = ref('all'); // 'all', 'shop', 'warehouse', 'remote'
+
+const showAddModal = ref(false);
+const showBrandModal = ref(false);
+const showTransferModal = ref(false);
+const showDeductModal = ref(false);
+const selectedItem = ref(null);
 
 const form = useForm({
     name: '',
+    brand_id: '',
     category: '',
     cost_price: 0,
     selling_price: 0,
@@ -35,6 +43,10 @@ const form = useForm({
     low_stock_threshold: 10,
 });
 
+const brandForm = useForm({
+    name: '',
+});
+
 const transferForm = useForm({
     quantity: 1,
     from: 'warehouse',
@@ -42,15 +54,24 @@ const transferForm = useForm({
     notes: '',
 });
 
+const deductForm = useForm({
+    customer_id: '',
+    quantity: 1,
+    location: 'shop',
+    notes: '',
+});
+
 const openAddModal = () => {
     selectedItem.value = null;
     form.reset();
+    if (selectedBrandId.value) form.brand_id = selectedBrandId.value;
     showAddModal.value = true;
 };
 
 const openEditModal = (item) => {
     selectedItem.value = item;
     form.name = item.name;
+    form.brand_id = item.brand_id || '';
     form.category = item.category;
     form.cost_price = item.cost_price;
     form.selling_price = item.selling_price;
@@ -65,6 +86,21 @@ const openTransferModal = (item) => {
     selectedItem.value = item;
     transferForm.reset();
     showTransferModal.value = true;
+};
+
+const openDeductModal = (item) => {
+    selectedItem.value = item;
+    deductForm.reset();
+    showDeductModal.value = true;
+};
+
+const submitBrand = () => {
+    brandForm.post('/brands', {
+        onSuccess: () => {
+            showBrandModal.value = false;
+            brandForm.reset();
+        }
+    });
 };
 
 const submit = () => {
@@ -94,8 +130,17 @@ const submitTransfer = () => {
     });
 };
 
+const submitDeduction = () => {
+    deductForm.post(`/inventory/${selectedItem.value.id}/deduct`, {
+        onSuccess: () => {
+            showDeductModal.value = false;
+            deductForm.reset();
+        }
+    });
+};
+
 const formatCurrency = (value) => {
-    return new Intl.NumberFormat('en-AE', { style: 'currency', currency: 'AED' }).format(value);
+    return new Intl.NumberFormat('en-AE', { style: 'currency', currency: 'AED' }).format(value || 0);
 };
 
 const locations = [
@@ -105,15 +150,36 @@ const locations = [
 ];
 
 const filteredInventory = computed(() => {
-    if (locationTab.value === 'all') return props.inventory;
+    let items = props.inventory;
     
-    return props.inventory.filter(item => {
+    if (selectedBrandId.value) {
+        items = items.filter(i => i.brand_id === selectedBrandId.value);
+    }
+
+    if (locationTab.value === 'all') return items;
+    
+    return items.filter(item => {
         if (locationTab.value === 'shop') return item.shop_quantity > 0;
         if (locationTab.value === 'warehouse') return item.warehouse_quantity > 0;
         if (locationTab.value === 'remote') return item.remote_quantity > 0;
         return true;
     });
 });
+
+const selectBrand = (brandId) => {
+    selectedBrandId.value = brandId;
+    viewMode.value = 'products';
+};
+
+const goBackToBrands = () => {
+    selectedBrandId.value = null;
+    viewMode.value = 'brands';
+};
+
+const getBrandName = (id) => {
+    const b = props.brands.find(b => b.id === id);
+    return b ? b.name : 'No Brand';
+};
 </script>
 
 <template>
@@ -123,7 +189,14 @@ const filteredInventory = computed(() => {
         <!-- Page Header -->
         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
-                <h1 class="text-2xl font-headline font-bold text-on-surface tracking-tight">Inventory</h1>
+                <div class="flex items-center gap-2">
+                    <button v-if="viewMode === 'products' && selectedBrandId" @click="goBackToBrands" class="p-1 hover:bg-surface-container-low rounded-lg transition-colors">
+                        <span class="material-symbols-outlined text-outline">arrow_back</span>
+                    </button>
+                    <h1 class="text-2xl font-headline font-bold text-on-surface tracking-tight">
+                        {{ viewMode === 'brands' ? 'Inventory' : getBrandName(selectedBrandId) }}
+                    </h1>
+                </div>
                 <p class="text-sm text-outline font-label">Manage products across 3 storage locations</p>
             </div>
             <div class="flex items-center gap-3">
@@ -143,7 +216,13 @@ const filteredInventory = computed(() => {
                         Stock History
                     </button>
                 </div>
-                <PrimaryButton @click="openAddModal" class="flex items-center gap-2">
+                
+                <SecondaryButton v-if="activeTab === 'inventory'" @click="showBrandModal = true" class="flex items-center gap-2">
+                    <span class="material-symbols-outlined text-[18px]">add_business</span>
+                    Add Brand
+                </SecondaryButton>
+
+                <PrimaryButton v-if="activeTab === 'inventory'" @click="openAddModal" class="flex items-center gap-2">
                     <span class="material-symbols-outlined text-[18px]">add</span>
                     Add Product
                 </PrimaryButton>
@@ -184,73 +263,113 @@ const filteredInventory = computed(() => {
         </div>
 
         <!-- Main Content -->
-        <div v-if="activeTab === 'inventory'" class="bg-surface-container-lowest border border-outline-variant/20 rounded-2xl shadow-sm overflow-hidden flex flex-col">
+        <div v-if="activeTab === 'inventory'">
             
-            <!-- Location Tabs -->
-            <div class="p-4 border-b border-outline-variant/20 flex gap-2 overflow-x-auto">
-                <button @click="locationTab = 'all'" :class="locationTab === 'all' ? 'bg-primary/10 text-primary border-primary/20' : 'bg-surface-container-low text-outline border-outline-variant/20 hover:text-on-surface'" class="px-5 py-2 rounded-lg text-xs font-black uppercase tracking-widest border transition-all">All Locations</button>
-                <button @click="locationTab = 'shop'" :class="locationTab === 'shop' ? 'bg-primary/10 text-primary border-primary/20' : 'bg-surface-container-low text-outline border-outline-variant/20 hover:text-on-surface'" class="px-5 py-2 rounded-lg text-xs font-black uppercase tracking-widest border transition-all">Shop</button>
-                <button @click="locationTab = 'warehouse'" :class="locationTab === 'warehouse' ? 'bg-primary/10 text-primary border-primary/20' : 'bg-surface-container-low text-outline border-outline-variant/20 hover:text-on-surface'" class="px-5 py-2 rounded-lg text-xs font-black uppercase tracking-widest border transition-all">Main Warehouse</button>
-                <button @click="locationTab = 'remote'" :class="locationTab === 'remote' ? 'bg-primary/10 text-primary border-primary/20' : 'bg-surface-container-low text-outline border-outline-variant/20 hover:text-on-surface'" class="px-5 py-2 rounded-lg text-xs font-black uppercase tracking-widest border transition-all">Remote Warehouse</button>
+            <!-- BRANDS VIEW -->
+            <div v-if="viewMode === 'brands'" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div v-for="brand in brands" :key="brand.id" 
+                    @click="selectBrand(brand.id)"
+                    class="group bg-surface-container-lowest border border-outline-variant/20 p-8 rounded-[2rem] shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all cursor-pointer text-center"
+                >
+                    <div class="w-20 h-20 bg-primary/5 rounded-3xl flex items-center justify-center text-primary mx-auto mb-6 group-hover:bg-primary group-hover:text-on-primary transition-all duration-500">
+                        <span class="material-symbols-outlined text-4xl">branding_watermark</span>
+                    </div>
+                    <h3 class="text-2xl font-headline font-black text-on-surface mb-2">{{ brand.name }}</h3>
+                    <p class="text-xs font-bold text-outline uppercase tracking-widest">{{ brand.products_count }} Items</p>
+                </div>
+
+                <!-- Empty State -->
+                <div v-if="brands.length === 0" class="col-span-full py-20 text-center bg-surface-container-low/20 rounded-[2rem] border-2 border-dashed border-outline-variant/20">
+                    <span class="material-symbols-outlined text-6xl text-outline mb-4">branding_watermark</span>
+                    <h3 class="text-xl font-headline font-bold text-outline">No brands added yet</h3>
+                    <PrimaryButton @click="showBrandModal = true" class="mt-4">Add Your First Brand</PrimaryButton>
+                </div>
             </div>
 
-            <div class="overflow-x-auto">
-                <table class="w-full text-left border-collapse">
-                    <thead>
-                        <tr class="bg-surface-container-low/50 text-lg font-bold text-outline uppercase tracking-wider">
-                            <th class="px-6 py-5">Product Info</th>
-                            <th v-if="locationTab === 'all' || locationTab === 'shop'" class="px-6 py-5">Shop</th>
-                            <th v-if="locationTab === 'all' || locationTab === 'warehouse'" class="px-6 py-5">Warehouse</th>
-                            <th v-if="locationTab === 'all' || locationTab === 'remote'" class="px-6 py-5">Remote</th>
-                            <th class="px-6 py-5">Total</th>
-                            <th class="px-6 py-5">Prices (AED)</th>
-                            <th class="px-6 py-5 text-center">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-outline-variant/10">
-                        <tr v-for="item in filteredInventory" :key="item.id" class="hover:bg-surface-container-low/30 transition-colors group">
-                            <td class="px-6 py-6">
-                                <div class="flex flex-col">
-                                    <span class="text-xl font-bold text-on-surface">{{ item.name }}</span>
-                                    <div class="flex items-center gap-2 mt-0.5">
-                                        <span v-if="item.category" class="text-base text-primary font-bold">{{ item.category }}</span>
+            <!-- PRODUCTS VIEW -->
+            <div v-else class="bg-surface-container-lowest border border-outline-variant/20 rounded-2xl shadow-sm overflow-hidden flex flex-col">
+                
+                <!-- Location Tabs (RESTORED ORIGINAL LABELS) -->
+                <div class="p-4 border-b border-outline-variant/20 flex flex-wrap items-center justify-between gap-4">
+                    <div class="flex gap-2 overflow-x-auto">
+                        <button @click="locationTab = 'all'" :class="locationTab === 'all' ? 'bg-primary text-on-primary' : 'bg-surface-container-low text-outline hover:text-on-surface'" class="px-5 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all">All Locations</button>
+                        <button @click="locationTab = 'shop'" :class="locationTab === 'shop' ? 'bg-primary text-on-primary' : 'bg-surface-container-low text-outline hover:text-on-surface'" class="px-5 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all">Shop</button>
+                        <button @click="locationTab = 'warehouse'" :class="locationTab === 'warehouse' ? 'bg-primary text-on-primary' : 'bg-surface-container-low text-outline hover:text-on-surface'" class="px-5 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all">Main Warehouse</button>
+                        <button @click="locationTab = 'remote'" :class="locationTab === 'remote' ? 'bg-primary text-on-primary' : 'bg-surface-container-low text-outline hover:text-on-surface'" class="px-5 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all">Remote Warehouse</button>
+                    </div>
+                    <button @click="goBackToBrands" class="px-4 py-2 bg-surface-container-low text-outline rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-primary/10 hover:text-primary transition-all flex items-center gap-2">
+                        <span class="material-symbols-outlined text-sm">grid_view</span>
+                        Switch Brand
+                    </button>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-surface-container-low/50 text-lg font-bold text-outline uppercase tracking-wider">
+                                <th class="px-6 py-5">Product Info</th>
+                                <th v-if="locationTab === 'all' || locationTab === 'shop'" class="px-6 py-5">Shop</th>
+                                <th v-if="locationTab === 'all' || locationTab === 'warehouse'" class="px-6 py-5 text-center">Warehouse</th>
+                                <th v-if="locationTab === 'all' || locationTab === 'remote'" class="px-6 py-5 text-center">Remote</th>
+                                <th class="px-6 py-5 text-center">Total</th>
+                                <th class="px-6 py-5">Prices (AED)</th>
+                                <th class="px-6 py-5 text-center">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-outline-variant/10">
+                            <tr v-for="item in filteredInventory" :key="item.id" class="hover:bg-surface-container-low/30 transition-colors group">
+                                <td class="px-6 py-6">
+                                    <div class="flex flex-col">
+                                        <span class="text-xl font-bold text-on-surface">{{ item.name }}</span>
+                                        <div class="flex items-center gap-2 mt-0.5">
+                                            <span v-if="item.category" class="text-base text-primary font-bold">{{ item.category }}</span>
+                                            <span class="w-1 h-1 rounded-full bg-outline-variant/30"></span>
+                                            <span class="text-sm text-outline font-medium">{{ getBrandName(item.brand_id) }}</span>
+                                        </div>
                                     </div>
-                                </div>
-                            </td>
-                            <td v-if="locationTab === 'all' || locationTab === 'shop'" class="px-6 py-6 text-xl font-bold" :class="item.shop_quantity <= 2 ? 'text-error' : 'text-on-surface'">{{ item.shop_quantity }}</td>
-                            <td v-if="locationTab === 'all' || locationTab === 'warehouse'" class="px-6 py-6 text-xl font-bold text-on-surface">{{ item.warehouse_quantity }}</td>
-                            <td v-if="locationTab === 'all' || locationTab === 'remote'" class="px-6 py-6 text-xl font-bold text-on-surface">{{ item.remote_quantity }}</td>
-                            <td class="px-6 py-6">
-                                <div class="flex items-center gap-2">
-                                    <span class="text-xl font-black" :class="item.total_quantity <= item.low_stock_threshold ? 'text-error' : 'text-on-surface'">{{ item.total_quantity }}</span>
-                                    <span v-if="item.total_quantity <= item.low_stock_threshold" class="material-symbols-outlined text-error text-[20px]">priority_high</span>
-                                </div>
-                            </td>
-                            <td class="px-6 py-6">
-                                <div class="flex flex-col text-sm">
-                                    <span class="text-outline">Cost: {{ formatCurrency(item.cost_price) }}</span>
-                                    <span class="text-primary font-bold">Sell: {{ formatCurrency(item.selling_price) }}</span>
-                                </div>
-                            </td>
-                            <td class="px-6 py-4 text-center">
-                                <div class="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <button @click="openTransferModal(item)" class="p-1.5 text-outline hover:text-orange-500 transition-colors" title="Transfer"><span class="material-symbols-outlined text-[18px]">swap_horiz</span></button>
-                                    <button @click="openEditModal(item)" class="p-1.5 text-outline hover:text-primary transition-colors"><span class="material-symbols-outlined text-[18px]">edit</span></button>
-                                    <button @click="router.delete(`/inventory/${item.id}`)" class="p-1.5 text-outline hover:text-error transition-colors"><span class="material-symbols-outlined text-[18px]">delete</span></button>
-                                </div>
-                            </td>
-                        </tr>
-                        <tr v-if="filteredInventory.length === 0">
-                            <td colspan="7" class="py-12 text-center text-outline text-xs">
-                                No products found in this location.
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+                                </td>
+                                <td v-if="locationTab === 'all' || locationTab === 'shop'" class="px-6 py-6 text-2xl font-black" :class="item.shop_quantity <= item.low_stock_threshold ? 'text-error' : 'text-on-surface'">{{ item.shop_quantity }}</td>
+                                <td v-if="locationTab === 'all' || locationTab === 'warehouse'" class="px-6 py-6 text-2xl font-black text-center text-on-surface">{{ item.warehouse_quantity }}</td>
+                                <td v-if="locationTab === 'all' || locationTab === 'remote'" class="px-6 py-6 text-2xl font-black text-center text-on-surface">{{ item.remote_quantity }}</td>
+                                <td class="px-6 py-6 text-center">
+                                    <div class="flex items-center justify-center gap-2">
+                                        <span class="text-2xl font-black" :class="item.total_quantity <= item.low_stock_threshold ? 'text-error' : 'text-on-surface'">{{ item.total_quantity }}</span>
+                                        <span v-if="item.total_quantity <= item.low_stock_threshold" class="material-symbols-outlined text-error text-[20px]">priority_high</span>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-6">
+                                    <div class="flex flex-col text-sm font-bold">
+                                        <span class="text-outline">Cost: {{ formatCurrency(item.cost_price) }}</span>
+                                        <span class="text-primary">Sell: {{ formatCurrency(item.selling_price) }}</span>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 text-center">
+                                    <div class="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button @click="openDeductModal(item)" class="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors" title="Customer Deduction">
+                                            <span class="material-symbols-outlined text-[20px]">person_remove</span>
+                                        </button>
+                                        <button @click="openTransferModal(item)" class="p-2 text-orange-500 hover:bg-orange-50 rounded-lg transition-colors" title="Transfer">
+                                            <span class="material-symbols-outlined text-[20px]">swap_horiz</span>
+                                        </button>
+                                        <button @click="openEditModal(item)" class="p-2 text-outline hover:text-primary transition-colors">
+                                            <span class="material-symbols-outlined text-[20px]">edit</span>
+                                        </button>
+                                        <button @click="router.delete(`/inventory/${item.id}`)" class="p-2 text-outline hover:text-error transition-colors">
+                                            <span class="material-symbols-outlined text-[20px]">delete</span>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr v-if="filteredInventory.length === 0">
+                                <td colspan="7" class="py-20 text-center text-outline italic">No products found in this brand.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
 
-        <!-- History Tab -->
+        <!-- History Tab (RESTORED ORIGINAL) -->
         <div v-else class="bg-surface-container-lowest border border-outline-variant/20 rounded-2xl shadow-sm overflow-hidden">
             <div class="overflow-x-auto">
                 <table class="w-full text-left border-collapse">
@@ -259,43 +378,46 @@ const filteredInventory = computed(() => {
                             <th class="px-6 py-5">Date</th>
                             <th class="px-6 py-5">Product</th>
                             <th class="px-6 py-5">Type</th>
-                            <th class="px-6 py-5">Quantity</th>
-                            <th class="px-6 py-5">Route</th>
-                            <th class="px-6 py-5">Notes</th>
+                            <th class="px-6 py-5 text-center">Quantity</th>
+                            <th class="px-6 py-5">Movement Details</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-outline-variant/10">
-                        <tr v-for="move in movements" :key="move.id" class="text-lg hover:bg-surface-container-low/30 transition-colors">
-                            <td class="px-6 py-5 text-outline">{{ new Date(move.created_at).toLocaleString() }}</td>
+                        <tr v-for="move in movements" :key="move.id" class="hover:bg-surface-container-low/30 transition-colors">
+                            <td class="px-6 py-5 text-outline text-sm">{{ new Date(move.created_at).toLocaleString() }}</td>
                             <td class="px-6 py-5 font-bold">{{ move.inventory?.name || 'Unknown' }}</td>
                             <td class="px-6 py-5">
-                                <Badge :variant="move.type === 'in' ? 'success' : (move.type === 'transfer' ? 'warning' : 'error')" class="text-base px-3 py-1.5">
+                                <Badge :variant="move.type === 'in' ? 'success' : (move.type === 'transfer' ? 'warning' : 'error')" class="px-3 py-1 font-black text-xs">
                                     {{ move.type.toUpperCase() }}
                                 </Badge>
                             </td>
-                            <td class="px-6 py-5 font-black text-xl">{{ move.quantity }}</td>
+                            <td class="px-6 py-5 font-black text-2xl text-center">{{ move.quantity }}</td>
                             <td class="px-6 py-5">
-                                <div class="flex items-center gap-1 text-base">
-                                    <span class="capitalize">{{ move.from_location || '-' }}</span>
-                                    <span v-if="move.to_location" class="material-symbols-outlined text-[16px]">arrow_forward</span>
-                                    <span class="capitalize">{{ move.to_location || '' }}</span>
+                                <div class="flex items-center gap-2 text-sm text-outline">
+                                    <span class="capitalize font-bold text-on-surface">{{ move.from_location || 'Source' }}</span>
+                                    <span class="material-symbols-outlined text-xs">arrow_forward</span>
+                                    <span class="capitalize font-bold text-on-surface">{{ move.to_location || 'Destination' }}</span>
+                                    <span v-if="move.notes" class="ml-4 italic text-[11px] opacity-70">({{ move.notes }})</span>
                                 </div>
                             </td>
-                            <td class="px-6 py-5 text-outline">{{ move.notes }}</td>
                         </tr>
                     </tbody>
                 </table>
             </div>
         </div>
 
-        <!-- Add/Edit Modal -->
+        <!-- Modals (RESTORED ORIGINAL LABELS) -->
+        <!-- Add/Edit Product Modal -->
         <SideModal :show="showAddModal" :title="selectedItem ? 'Edit Product' : 'Add Product'" @close="showAddModal = false">
             <form @submit.prevent="submit" class="space-y-4 p-2">
+                <FormField label="Brand" :error="form.errors.brand_id" required>
+                    <SelectInput v-model="form.brand_id" :options="brands.map(b => ({label: b.name, value: b.id}))" placeholder="Select Brand..." />
+                </FormField>
                 <FormField label="Product Name" :error="form.errors.name" required>
                     <TextInput v-model="form.name" placeholder="Item Name" />
                 </FormField>
                 <FormField label="Category" :error="form.errors.category">
-                    <TextInput v-model="form.category" placeholder="Electronics" />
+                    <TextInput v-model="form.category" placeholder="Electronics, Fashion, etc." />
                 </FormField>
                 <div class="grid grid-cols-2 gap-4">
                     <FormField label="Cost Price (AED)" :error="form.errors.cost_price">
@@ -327,43 +449,80 @@ const filteredInventory = computed(() => {
             </form>
         </SideModal>
 
+        <!-- Add Brand Modal -->
+        <SideModal :show="showBrandModal" title="Add New Brand" @close="showBrandModal = false">
+            <form @submit.prevent="submitBrand" class="space-y-4 p-2">
+                <FormField label="Brand Name" :error="brandForm.errors.name" required>
+                    <TextInput v-model="brandForm.name" placeholder="Brand Name (e.g. Apple, Nike)" />
+                </FormField>
+                <div class="pt-6 flex justify-end gap-3 border-t border-outline-variant/10 mt-6">
+                    <SecondaryButton @click="showBrandModal = false" type="button">Cancel</SecondaryButton>
+                    <PrimaryButton :loading="brandForm.processing">Create Brand</PrimaryButton>
+                </div>
+            </form>
+        </SideModal>
+
         <!-- Transfer Modal -->
         <SideModal :show="showTransferModal" title="Stock Transfer" @close="showTransferModal = false">
             <div v-if="selectedItem" class="p-2 space-y-6">
                 <div class="bg-primary/5 p-4 rounded-xl border border-primary/10">
                     <p class="text-[10px] font-bold text-primary uppercase mb-1">Transferring</p>
-                    <p class="text-sm font-bold">{{ selectedItem.name }}</p>
-                    <div class="flex gap-4 mt-2 text-[10px]">
+                    <p class="text-sm font-bold text-on-surface">{{ selectedItem.name }}</p>
+                    <div class="flex gap-4 mt-2 text-[10px] font-black text-outline">
                         <span>Shop: {{ selectedItem.shop_quantity }}</span>
                         <span>Warehouse: {{ selectedItem.warehouse_quantity }}</span>
                         <span>Remote: {{ selectedItem.remote_quantity }}</span>
                     </div>
                 </div>
-
                 <form @submit.prevent="submitTransfer" class="space-y-4">
                     <div class="grid grid-cols-2 gap-4">
-                        <FormField label="From" required>
-                            <SelectInput v-model="transferForm.from" :options="locations" />
-                        </FormField>
-                        <FormField label="To" required>
-                            <SelectInput v-model="transferForm.to" :options="locations" />
-                        </FormField>
+                        <FormField label="From" required><SelectInput v-model="transferForm.from" :options="locations" /></FormField>
+                        <FormField label="To" required><SelectInput v-model="transferForm.to" :options="locations" /></FormField>
                     </div>
                     <FormField label="Quantity" required :error="transferForm.errors.quantity">
                         <TextInput v-model="transferForm.quantity" type="number" />
                     </FormField>
-                    <FormField label="Notes">
-                        <TextInput v-model="transferForm.notes" placeholder="Reason for transfer" />
-                    </FormField>
-
-                    <div class="pt-6 flex justify-end gap-3 border-t border-outline-variant/10 mt-6">
+                    <FormField label="Notes"><TextInput v-model="transferForm.notes" placeholder="Reason for transfer..." /></FormField>
+                    <div class="pt-6 flex justify-end gap-3 border-t mt-6">
                         <SecondaryButton @click="showTransferModal = false" type="button">Cancel</SecondaryButton>
-                        <PrimaryButton :loading="transferForm.processing" class="!bg-orange-600 hover:!bg-orange-700">
-                            Transfer Now
-                        </PrimaryButton>
+                        <PrimaryButton :loading="transferForm.processing" class="!bg-orange-600 hover:!bg-orange-700">Confirm Transfer</PrimaryButton>
+                    </div>
+                </form>
+            </div>
+        </SideModal>
+
+        <!-- Deduct Modal -->
+        <SideModal :show="showDeductModal" title="Deduct for Customer" @close="showDeductModal = false">
+            <div v-if="selectedItem" class="p-2 space-y-6">
+                <div class="bg-rose-50 p-4 rounded-xl border border-rose-100 text-rose-900">
+                    <p class="text-[10px] font-bold uppercase mb-1">Deducting Stock</p>
+                    <p class="text-sm font-bold">{{ selectedItem.name }}</p>
+                    <div class="flex gap-4 mt-2 text-[10px] font-black opacity-60">
+                        <span>Shop: {{ selectedItem.shop_quantity }}</span>
+                        <span>Warehouse: {{ selectedItem.warehouse_quantity }}</span>
+                        <span>Remote: {{ selectedItem.remote_quantity }}</span>
+                    </div>
+                </div>
+                <form @submit.prevent="submitDeduction" class="space-y-4">
+                    <FormField label="Select Customer" required :error="deductForm.errors.customer_id">
+                        <SelectInput v-model="deductForm.customer_id" :options="customers.map(c => ({label: c.name, value: c.id}))" placeholder="Choose a customer..." />
+                    </FormField>
+                    <div class="grid grid-cols-2 gap-4">
+                        <FormField label="From Location" required><SelectInput v-model="deductForm.location" :options="locations" /></FormField>
+                        <FormField label="Quantity" required :error="deductForm.errors.quantity"><TextInput v-model="deductForm.quantity" type="number" /></FormField>
+                    </div>
+                    <FormField label="Notes"><TextInput v-model="deductForm.notes" placeholder="e.g. Returned item, sample..." /></FormField>
+                    <div class="pt-6 flex justify-end gap-3 border-t mt-6">
+                        <SecondaryButton @click="showDeductModal = false" type="button">Cancel</SecondaryButton>
+                        <PrimaryButton :loading="deductForm.processing" class="!bg-rose-600 hover:!bg-rose-700">Confirm Deduction</PrimaryButton>
                     </div>
                 </form>
             </div>
         </SideModal>
     </div>
 </template>
+
+<style scoped>
+.font-black { font-weight: 900; }
+.tracking-tight { letter-spacing: -0.025em; }
+</style>

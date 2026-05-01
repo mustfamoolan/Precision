@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Inventory;
 use App\Models\StockMovement;
+use App\Models\Brand;
+use App\Models\Customer;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\DB;
 
@@ -15,7 +17,8 @@ class InventoryController extends Controller
      */
     public function index()
     {
-        $inventory = Inventory::latest()->get();
+        $inventory = Inventory::with('brand')->latest()->get();
+        $brands = Brand::withCount('products')->get();
         
         $summary = [
             'total_items' => $inventory->count(),
@@ -25,6 +28,8 @@ class InventoryController extends Controller
 
         return Inertia::render('Inventory', [
             'inventory' => $inventory,
+            'brands' => $brands,
+            'customers' => Customer::all(['id', 'name']),
             'summary' => $summary,
             'movements' => StockMovement::with('inventory')->latest()->limit(20)->get()
         ]);
@@ -37,6 +42,7 @@ class InventoryController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
+            'brand_id' => 'nullable|exists:brands,id',
             'category' => 'nullable|string|max:100',
             'cost_price' => 'nullable|numeric|min:0',
             'selling_price' => 'nullable|numeric|min:0',
@@ -71,6 +77,7 @@ class InventoryController extends Controller
     {
         $validated = $request->validate([
             'name' => 'sometimes|required|string|max:255',
+            'brand_id' => 'nullable|exists:brands,id',
             'category' => 'nullable|string|max:100',
             'cost_price' => 'nullable|numeric|min:0',
             'selling_price' => 'nullable|numeric|min:0',
@@ -83,6 +90,57 @@ class InventoryController extends Controller
         $inventory->update($validated);
 
         return redirect()->back()->with('success', 'Inventory updated.');
+    }
+
+    /**
+     * Store a newly created brand.
+     */
+    public function storeBrand(Request $request)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255|unique:brands,name',
+        ]);
+
+        Brand::create($validated);
+
+        return redirect()->back()->with('success', 'Brand added successfully.');
+    }
+
+    /**
+     * Deduct stock for a customer.
+     */
+    public function deductForCustomer(Request $request, Inventory $inventory)
+    {
+        $validated = $request->validate([
+            'customer_id' => 'required|exists:customers,id',
+            'quantity' => 'required|integer|min:1',
+            'location' => 'required|in:shop,warehouse,remote',
+            'notes' => 'nullable|string',
+        ]);
+
+        $field = $validated['location'] . '_quantity';
+
+        if ($inventory->$field < $validated['quantity']) {
+            return redirect()->back()->withErrors(['quantity' => 'Insufficient stock in selected location.']);
+        }
+
+        $customer = Customer::find($validated['customer_id']);
+
+        return DB::transaction(function () use ($inventory, $validated, $field, $customer) {
+            $inventory->$field -= $validated['quantity'];
+            $inventory->save();
+
+            $this->logMovement(
+                $inventory->id, 
+                $validated['quantity'], 
+                'out', 
+                $validated['location'], 
+                'customer', 
+                ($validated['notes'] ?? 'Deduction for customer') . ": " . $customer->name
+            );
+
+            return redirect()->back()->with('success', 'Stock deducted successfully.');
+        });
     }
 
     /**

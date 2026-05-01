@@ -16,12 +16,14 @@ class ExpenseController extends Controller
 
         // Filtering Logic
         if ($request->filled(['start_date', 'end_date'])) {
-            $query->whereBetween('date', [$request->start_date, $request->end_date]);
-        } elseif ($request->get('filter') === 'week') {
-            $query->where('date', '>=', Carbon::now()->startOfWeek());
-        } elseif ($request->get('filter') === 'month') {
-            $query->whereMonth('date', Carbon::now()->month)
-                  ->whereYear('date', Carbon::now()->year);
+            $start = Carbon::parse($request->start_date)->startOfDay();
+            $end = Carbon::parse($request->end_date)->endOfDay();
+            $query->whereBetween('date', [$start, $end]);
+        } else {
+            // Default to current month (resets on the 1st of every month)
+            $start = Carbon::now()->startOfMonth();
+            $end = Carbon::now()->endOfMonth();
+            $query->whereBetween('date', [$start, $end]);
         }
 
         if ($request->filled('category') && $request->category !== 'All') {
@@ -53,6 +55,7 @@ class ExpenseController extends Controller
         return Inertia::render('Expenses', [
             'expenses' => $expenses,
             'employees' => Employee::all(['id', 'name']),
+            'banks' => \App\Models\Bank::all(['id', 'name']),
             'summary' => [
                 'total' => $totalExpenses,
                 'office' => $officeExpenses,
@@ -60,7 +63,10 @@ class ExpenseController extends Controller
                 'employee' => $employeeExpenses,
                 'this_month_count' => $thisMonthCount,
             ],
-            'filters' => $request->all(['filter', 'search', 'start_date', 'end_date', 'category']),
+            'filters' => array_merge($request->all(['filter', 'search', 'category']), [
+                'start_date' => $start->format('Y-m-d'),
+                'end_date' => $end->format('Y-m-d'),
+            ]),
         ]);
     }
 
@@ -78,6 +84,10 @@ class ExpenseController extends Controller
             'status' => 'required|string',
             'bank_id' => 'nullable|exists:banks,id',
         ]);
+
+        if ($validated['expense_number'] && !str_starts_with($validated['expense_number'], 'EXP-')) {
+            $validated['expense_number'] = 'EXP-' . $validated['expense_number'];
+        }
 
         Expense::create($validated);
 

@@ -142,6 +142,8 @@ class ShippingToolController extends Controller
             'product_name' => 'required|string',
             'quantity'     => 'required|integer|min:1',
             'type'         => 'nullable|string',
+            'cost'         => 'nullable|numeric|min:0',
+            'currency'     => 'nullable|string|max:10',
         ]);
 
         $shipment->items()->create($validated);

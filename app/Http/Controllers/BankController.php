@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\Bank;
 use App\Models\Cheque;
 use App\Models\Expense;
+use App\Models\BankTransaction;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\DB;
 
@@ -21,10 +22,10 @@ class BankController extends Controller
         $bank2 = $banks->firstWhere('name', 'Bank 2');
         $cash = $banks->firstWhere('name', 'Cash');
 
-        $transactions = \App\Models\BankTransaction::with('bank')->latest('date')->latest('id')->take(50)->get();
-        $cash_log = \App\Models\BankTransaction::whereHas('bank', function($query) {
+        $transactions = BankTransaction::with('bank')->latest('date')->latest('id')->take(100)->get();
+        $cash_log = BankTransaction::whereHas('bank', function($query) {
             $query->where('name', 'Cash');
-        })->latest('date')->latest('id')->take(50)->get();
+        })->latest('date')->latest('id')->take(100)->get();
 
         return Inertia::render('Banks', [
             'banks' => $banks,
@@ -41,17 +42,72 @@ class BankController extends Controller
     }
 
     /**
-     * Create a new bank account (Optional, but included for flexibility).
+     * Create a new bank account with opening balance.
      */
     public function store(Request $request)
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'balance' => 'required|numeric|min:0',
+            'balance' => 'required|numeric',
         ]);
 
-        Bank::create($validated);
-        return redirect()->back()->with('success', 'Bank account added.');
+        return DB::transaction(function () use ($validated) {
+            $bank = Bank::create($validated);
+
+            if ($validated['balance'] != 0) {
+                BankTransaction::create([
+                    'bank_id' => $bank->id,
+                    'amount' => abs($validated['balance']),
+                    'type' => $validated['balance'] > 0 ? 'deposit' : 'withdrawal',
+                    'reference_type' => 'Opening Balance',
+                    'description' => 'Initial balance for ' . $bank->name,
+                    'date' => now(),
+                ]);
+            }
+
+            return redirect()->back()->with('success', 'Bank account added with opening balance.');
+        });
+    }
+
+    /**
+     * Manual adjustment of bank/cash balance.
+     */
+    public function adjustBalance(Request $request)
+    {
+        $validated = $request->validate([
+            'bank_id' => 'required|exists:banks,id',
+            'amount' => 'required|numeric|min:0.01',
+            'type' => 'required|in:deposit,withdrawal',
+            'description' => 'required|string|max:255',
+            'date' => 'required|date',
+        ]);
+
+        return DB::transaction(function () use ($validated) {
+            $bank = Bank::lockForUpdate()->find($validated['bank_id']);
+
+            if ($validated['type'] === 'withdrawal' && $bank->balance < $validated['amount']) {
+                return redirect()->back()->withErrors(['amount' => 'Insufficient funds in ' . $bank->name]);
+            }
+
+            // Create Transaction Record
+            BankTransaction::create([
+                'bank_id' => $bank->id,
+                'amount' => $validated['amount'],
+                'type' => $validated['type'],
+                'reference_type' => 'Manual Adjustment',
+                'description' => $validated['description'],
+                'date' => $validated['date'],
+            ]);
+
+            // Update Bank Balance
+            if ($validated['type'] === 'deposit') {
+                $bank->increment('balance', $validated['amount']);
+            } else {
+                $bank->decrement('balance', $validated['amount']);
+            }
+
+            return redirect()->back()->with('success', 'Balance adjusted successfully.');
+        });
     }
 
     /**
@@ -61,7 +117,7 @@ class BankController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'balance' => 'required|numeric|min:0',
+            'balance' => 'required|numeric',
         ]);
 
         $bank->update($validated);
@@ -88,17 +144,22 @@ class BankController extends Controller
                 return redirect()->back()->withErrors(['amount' => 'Insufficient bank balance.']);
             }
 
-            // Create expense (Assume employee_id is 1 or optional for bank-direct expenses)
-            // If the schema requires employee_id, we'll need to handle it. 
-            // In Expense.php, it's 'employee_id' => 'required' in ExpenseController@store.
-            // I'll check the Expense model/migration.
-            
             Expense::create([
                 'date' => $validated['date'],
                 'description' => $validated['description'],
                 'amount' => $validated['amount'],
                 'bank_id' => $validated['bank_id'],
                 'employee_id' => $validated['employee_id'],
+            ]);
+
+            // Log Transaction
+            BankTransaction::create([
+                'bank_id' => $bank->id,
+                'amount' => $validated['amount'],
+                'type' => 'withdrawal',
+                'reference_type' => 'Expense',
+                'description' => $validated['description'],
+                'date' => $validated['date'],
             ]);
 
             $bank->decrement('balance', $validated['amount']);

@@ -40,7 +40,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/inventory', [\App\Http\Controllers\InventoryController::class, 'store']);
     Route::put('/inventory/{inventory}', [\App\Http\Controllers\InventoryController::class, 'update']);
     Route::post('/inventory/{inventory}/transfer', [\App\Http\Controllers\InventoryController::class, 'transfer']);
+    Route::post('/inventory/{inventory}/deduct', [\App\Http\Controllers\InventoryController::class, 'deductForCustomer']);
     Route::delete('/inventory/{inventory}', [\App\Http\Controllers\InventoryController::class, 'destroy']);
+    Route::post('/brands', [\App\Http\Controllers\InventoryController::class, 'storeBrand']);
     Route::get('/reminders', [\App\Http\Controllers\ReminderController::class, 'index'])->name('reminders');
     Route::post('/reminders', [\App\Http\Controllers\ReminderController::class, 'store']);
     Route::put('/reminders/{reminder}', [\App\Http\Controllers\ReminderController::class, 'update']);
@@ -71,6 +73,8 @@ Route::middleware('auth')->group(function () {
     
     // Bank System Routes
     Route::get('/banks', [\App\Http\Controllers\BankController::class, 'index'])->name('banks');
+    Route::post('/banks', [\App\Http\Controllers\BankController::class, 'store']);
+    Route::post('/banks/adjust', [\App\Http\Controllers\BankController::class, 'adjustBalance']);
     Route::post('/banks/expense', [\App\Http\Controllers\BankController::class, 'storeExpense']);
     Route::post('/cheques', [\App\Http\Controllers\ChequeController::class, 'store']);
     Route::post('/cheques/{cheque}/receive', [\App\Http\Controllers\ChequeController::class, 'receive']);

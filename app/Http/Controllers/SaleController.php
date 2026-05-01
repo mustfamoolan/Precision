@@ -21,12 +21,19 @@ class SaleController extends Controller
 
         // Filtering Logic
         if ($request->filled(['start_date', 'end_date'])) {
-            $query->whereBetween('date', [$request->start_date, $request->end_date]);
-        } elseif ($request->get('filter') === 'week') {
+            $start = Carbon::parse($request->start_date)->startOfDay();
+            $end = Carbon::parse($request->end_date)->endOfDay();
+            $query->whereBetween('date', [$start, $end]);
+        } else {
+            // Default to current month
+            $start = Carbon::now()->startOfMonth();
+            $end = Carbon::now()->endOfMonth();
+            $query->whereBetween('date', [$start, $end]);
+        }
+
+        // Additional legacy filters if still used
+        if ($request->get('filter') === 'week') {
             $query->where('date', '>=', Carbon::now()->startOfWeek());
-        } elseif ($request->get('filter') === 'month') {
-            $query->whereMonth('date', Carbon::now()->month)
-                  ->whereYear('date', Carbon::now()->year);
         }
 
         if ($request->filled('search')) {
@@ -41,7 +48,7 @@ class SaleController extends Controller
             $query->where('status', $request->status);
         }
 
-        $sales = $query->latest('date')->get();
+        $sales = $query->with(['payments.bank', 'bank'])->latest('date')->get();
         
         // Summary Data for the current view
         $totalAmount = $query->sum('amount');
@@ -58,7 +65,11 @@ class SaleController extends Controller
                 'total_overdue' => $totalOverdue,
                 'total_count' => $sales->count(),
             ],
-            'filters' => $request->all(['filter', 'search', 'start_date', 'end_date', 'type']),
+            'filters' => array_merge($request->all(['filter', 'search', 'type']), [
+                'start_date' => $start->format('Y-m-d'),
+                'end_date' => $end->format('Y-m-d'),
+                'status' => $request->get('status', 'all'),
+            ]),
             'banks' => Bank::all(['id', 'name']),
             'customers' => \App\Models\Customer::all(['id', 'name']),
             'local_invoices' => Sale::where('type', 'local')->get(['id', 'invoice_number']),
@@ -81,6 +92,10 @@ class SaleController extends Controller
         ]);
 
         $validated['paid_amount'] = $validated['paid_amount'] ?? 0;
+        
+        if ($validated['container_number'] && !str_starts_with($validated['container_number'], 'CN-')) {
+            $validated['container_number'] = 'CN-' . $validated['container_number'];
+        }
         $validated['due_amount'] = $validated['amount'] - $validated['paid_amount'];
         
         if ($validated['due_amount'] <= 0) {
@@ -91,7 +106,20 @@ class SaleController extends Controller
             $validated['status'] = 'pending';
         }
 
-        Sale::create($validated);
+        $sale = \App\Models\Sale::withoutEvents(function () use ($validated) {
+            return \App\Models\Sale::create($validated);
+        });
+
+        // If initial payment exists, create a SalePayment record
+        if ($sale->paid_amount > 0 && $sale->bank_id) {
+            \App\Models\SalePayment::create([
+                'sale_id' => $sale->id,
+                'bank_id' => $sale->bank_id,
+                'amount' => $sale->paid_amount,
+                'date' => $sale->date,
+                'note' => 'Initial payment upon creation'
+            ]);
+        }
 
         return redirect()->back();
     }
@@ -112,6 +140,10 @@ class SaleController extends Controller
         ]);
 
         $validated['paid_amount'] = $validated['paid_amount'] ?? 0;
+
+        if ($validated['container_number'] && !str_starts_with($validated['container_number'], 'CN-')) {
+            $validated['container_number'] = 'CN-' . $validated['container_number'];
+        }
         $validated['due_amount'] = $validated['amount'] - $validated['paid_amount'];
         
         if ($validated['due_amount'] <= 0) {
@@ -122,7 +154,9 @@ class SaleController extends Controller
             $validated['status'] = 'pending';
         }
 
-        $sale->update($validated);
+        \App\Models\Sale::withoutEvents(function () use ($sale, $validated) {
+            $sale->update($validated);
+        });
 
         return redirect()->back();
     }
@@ -130,23 +164,38 @@ class SaleController extends Controller
     public function storePayment(Request $request, Sale $sale)
     {
         $request->validate([
-            'payment_amount' => 'required|numeric|min:0.01'
+            'payment_amount' => 'required|numeric|min:0.01',
+            'bank_id' => 'required|exists:banks,id',
+            'payment_date' => 'required|date',
         ]);
 
+        // Create individual payment record (this updates bank balance and records transaction)
+        \App\Models\SalePayment::create([
+            'sale_id' => $sale->id,
+            'bank_id' => $request->bank_id,
+            'amount' => $request->payment_amount,
+            'date' => $request->payment_date,
+        ]);
+
+        // Update the sale model totals
         $sale->paid_amount += $request->payment_amount;
+        $sale->bank_id = $request->bank_id; // Set last used bank
         $sale->due_amount = $sale->amount - $sale->paid_amount;
 
         if ($sale->due_amount <= 0) {
             $sale->status = 'paid';
-            $sale->due_amount = 0; // Prevent negative due
-            $sale->paid_amount = $sale->amount; // Cap paid amount
+            $sale->due_amount = 0;
+            $sale->paid_amount = $sale->amount;
         } elseif ($sale->paid_amount > 0) {
             $sale->status = 'partial';
         } else {
             $sale->status = 'pending';
         }
 
-        $sale->save();
+        // Use withoutEvents to prevent the SaleObserver from overwriting the history with one total transaction
+        \App\Models\Sale::withoutEvents(function () use ($sale) {
+            $sale->save();
+        });
 
         return redirect()->back();
     }

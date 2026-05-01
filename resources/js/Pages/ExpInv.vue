@@ -9,6 +9,7 @@ import SelectInput from '@/Components/SelectInput.vue';
 import Badge from '@/Components/Badge.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
+import { jsPDF } from 'jspdf';
 
 defineOptions({ layout: MainLayout });
 
@@ -33,6 +34,14 @@ const startDate = ref(props.filters.start_date || '');
 const endDate = ref(props.filters.end_date || '');
 const selectedStatus = ref(props.filters.status || 'all');
 
+const showPaymentModal = ref(false);
+const paymentSale = ref(null);
+
+const showHistoryModal = ref(false);
+const historySale = ref(null);
+
+const editingSale = ref(null);
+
 const form = useForm({
     date: new Date().toISOString().substr(0, 10),
     invoice_number: '',
@@ -46,13 +55,78 @@ const form = useForm({
     bank_id: '',
 });
 
-const submit = () => {
-    form.post('/sales', {
+const paymentForm = useForm({
+    payment_amount: '',
+    payment_date: new Date().toISOString().substr(0, 10),
+    bank_id: '',
+});
+
+const openPaymentModal = (sale) => {
+    paymentSale.value = sale;
+    paymentForm.payment_amount = sale.due_amount > 0 ? sale.due_amount : '';
+    paymentForm.payment_date = new Date().toISOString().substr(0, 10);
+    paymentForm.bank_id = sale.bank_id || '';
+    showPaymentModal.value = true;
+};
+
+const openHistoryModal = (sale) => {
+    historySale.value = sale;
+    showHistoryModal.value = true;
+};
+
+const openEditModal = (sale) => {
+    editingSale.value = sale;
+    form.date = sale.date;
+    form.invoice_number = sale.invoice_number ? sale.invoice_number.replace('INV-', '') : '';
+    form.customer_name = sale.customer_name;
+    form.amount = sale.amount;
+    form.type = 'export';
+    form.items_count = sale.items_count;
+    form.paid_amount = sale.paid_amount;
+    form.container_number = sale.container_number ? sale.container_number.replace('CN-', '') : '';
+    form.shipping_status = sale.shipping_status;
+    form.bank_id = sale.bank_id || '';
+    showAddModal.value = true;
+};
+
+const openAddModal = () => {
+    editingSale.value = null;
+    form.reset();
+    form.type = 'export';
+    form.date = new Date().toISOString().substr(0, 10);
+    showAddModal.value = true;
+};
+
+const submitPayment = () => {
+    paymentForm.post(`/sales/${paymentSale.value.id}/payments`, {
         onSuccess: () => {
-            showAddModal.value = false;
-            form.reset();
-        },
+            showPaymentModal.value = false;
+            paymentForm.reset();
+        }
     });
+};
+
+const submit = () => {
+    // Add prefix if not already there
+    if (form.invoice_number && !form.invoice_number.startsWith('INV-')) {
+        form.invoice_number = 'INV-' + form.invoice_number;
+    }
+
+    if (editingSale.value) {
+        form.put(`/sales/${editingSale.value.id}`, {
+            onSuccess: () => {
+                showAddModal.value = false;
+                form.reset();
+            },
+        });
+    } else {
+        form.post('/sales', {
+            onSuccess: () => {
+                showAddModal.value = false;
+                form.reset();
+            },
+        });
+    }
 };
 
 const handleSearch = () => {
@@ -73,6 +147,84 @@ const formatCurrency = (value) => {
 
 const shippingStatuses = ['On Board', 'In Transit', 'Delivered'];
 const statuses = [{label: 'All Status', value: 'all'}, {label: 'Paid', value: 'paid'}, {label: 'Partial', value: 'partial'}, {label: 'Pending', value: 'pending'}];
+
+const exportInvoicePDF = (sale) => {
+    const doc = new jsPDF();
+    const W = doc.internal.pageSize.getWidth();
+    
+    // Header styling
+    doc.setFillColor(30, 41, 59);
+    doc.rect(0, 0, W, 40, 'F');
+    
+    doc.setFontSize(22);
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.text('EXPORT INVOICE', 15, 20);
+    
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`DATE: ${sale.date}`, 15, 30);
+    doc.text(`INVOICE #: ${sale.invoice_number}`, W - 60, 30);
+    
+    // Content
+    doc.setTextColor(30, 41, 59);
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('BILL TO:', 15, 55);
+    
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(11);
+    doc.text(sale.customer_name, 15, 62);
+    
+    // Details Box
+    doc.setDrawColor(226, 232, 240);
+    doc.setFillColor(248, 250, 252);
+    doc.roundedRect(15, 75, W - 30, 30, 3, 3, 'FD');
+    
+    doc.setFont('helvetica', 'bold');
+    doc.text('Container / Shipment #:', 20, 85);
+    doc.text('Shipping Status:', 20, 95);
+    
+    doc.setFont('helvetica', 'normal');
+    doc.text(sale.container_number || 'N/A', 80, 85);
+    doc.text(sale.shipping_status || 'N/A', 80, 95);
+    
+    // Table
+    doc.setFillColor(241, 245, 249);
+    doc.rect(15, 115, W - 30, 10, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.text('Description', 20, 122);
+    doc.text('Total', W - 35, 122, { align: 'right' });
+    
+    doc.line(15, 125, W - 15, 125);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Export Sale - ${sale.container_number || 'General'}`, 20, 135);
+    doc.text(formatCurrency(sale.amount), W - 35, 135, { align: 'right' });
+    
+    // Totals
+    const totalY = 160;
+    doc.line(W - 80, totalY, W - 15, totalY);
+    
+    doc.setFont('helvetica', 'bold');
+    doc.text('Total Amount:', W - 80, totalY + 10);
+    doc.text(formatCurrency(sale.amount), W - 35, totalY + 10, { align: 'right' });
+    
+    doc.setTextColor(16, 185, 129);
+    doc.text('Total Paid:', W - 80, totalY + 20);
+    doc.text(formatCurrency(sale.paid_amount), W - 35, totalY + 20, { align: 'right' });
+    
+    doc.setTextColor(239, 68, 68);
+    doc.text('Balance Due:', W - 80, totalY + 30);
+    doc.text(formatCurrency(sale.due_amount), W - 35, totalY + 30, { align: 'right' });
+    
+    // Footer
+    doc.setFontSize(8);
+    doc.setTextColor(148, 163, 184);
+    doc.text('Thank you for your business.', W / 2, 280, { align: 'center' });
+    
+    doc.save(`Invoice_${sale.invoice_number}.pdf`);
+};
+
 </script>
 
 <template>
@@ -205,7 +357,7 @@ const statuses = [{label: 'All Status', value: 'all'}, {label: 'Paid', value: 'p
                 </div>
 
                 <div class="flex items-center gap-2">
-                    <button @click="showAddModal = true" class="flex items-center gap-2 px-6 py-3 bg-indigo-50 text-indigo-600 border border-indigo-100 rounded-2xl text-xs font-black uppercase tracking-widest shadow-sm hover:bg-indigo-100 transition-all active:scale-95">
+                    <button @click="openAddModal()" class="flex items-center gap-2 px-6 py-3 bg-indigo-50 text-indigo-600 border border-indigo-100 rounded-2xl text-xs font-black uppercase tracking-widest shadow-sm hover:bg-indigo-100 transition-all active:scale-95">
                         <span class="material-symbols-outlined text-[18px]">add</span>
                         Add EXP Invoice
                     </button>
@@ -257,6 +409,18 @@ const statuses = [{label: 'All Status', value: 'all'}, {label: 'Paid', value: 'p
                             </td>
                             <td class="py-5 px-8 text-center whitespace-nowrap">
                                 <div class="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button @click="exportInvoicePDF(sale)" class="w-8 h-8 rounded-xl bg-slate-900 text-white flex items-center justify-center hover:bg-slate-800 hover:scale-110 transition-all shadow-md" title="Download PDF">
+                                        <span class="material-symbols-outlined text-[16px]">picture_as_pdf</span>
+                                    </button>
+                                    <button @click="openHistoryModal(sale)" class="w-8 h-8 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-100 hover:scale-110 transition-all shadow-sm" title="Payment History">
+                                        <span class="material-symbols-outlined text-[16px]">history</span>
+                                    </button>
+                                    <button @click="openPaymentModal(sale)" class="w-8 h-8 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 hover:bg-emerald-100 hover:scale-110 transition-all shadow-sm" title="Record Payment">
+                                        <span class="material-symbols-outlined text-[16px]">payments</span>
+                                    </button>
+                                    <button @click="openEditModal(sale)" class="w-8 h-8 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-indigo-500 hover:border-indigo-200 hover:bg-indigo-50 transition-all shadow-sm" title="Edit">
+                                        <span class="material-symbols-outlined text-[16px]">edit</span>
+                                    </button>
                                     <button @click="router.delete(`/sales/${sale.id}`)" class="w-8 h-8 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-rose-500 hover:border-rose-200 hover:bg-rose-50 transition-all shadow-sm" title="Delete">
                                         <span class="material-symbols-outlined text-[16px]">delete</span>
                                     </button>
@@ -274,8 +438,8 @@ const statuses = [{label: 'All Status', value: 'all'}, {label: 'Paid', value: 'p
             </div>
         </div>
 
-        <!-- Add Modal -->
-        <SideModal :show="showAddModal" title="Add Export Invoice" @close="showAddModal = false">
+        <!-- Add/Edit Modal -->
+        <SideModal :show="showAddModal" :title="editingSale ? 'Edit EXP Invoice' : 'Add Export Invoice'" @close="showAddModal = false">
             <form @submit.prevent="submit" class="space-y-5 p-2">
                 <div class="grid grid-cols-2 gap-4">
                     <FormField label="Date" :error="form.errors.date" required>
@@ -283,17 +447,15 @@ const statuses = [{label: 'All Status', value: 'all'}, {label: 'Paid', value: 'p
                     </FormField>
                     
                     <FormField label="Invoice #" :error="form.errors.invoice_number" required>
-                        <div class="relative">
-                            <input 
-                                list="local-invoices-list" 
-                                v-model="form.invoice_number" 
-                                placeholder="Select or type..." 
-                                class="w-full bg-slate-50 text-slate-900 placeholder:text-slate-400 text-sm font-medium rounded-xl border border-slate-200 px-4 py-2.5 outline-none focus:ring-2 focus:ring-indigo-400 focus:bg-white transition-all"
-                            />
-                            <datalist id="local-invoices-list">
-                                <option v-for="inv in local_invoices" :key="inv.id" :value="inv.invoice_number"></option>
-                            </datalist>
-                        </div>
+                        <TextInput 
+                            v-model="form.invoice_number" 
+                            prefix="INV-" 
+                            placeholder="Select or type..." 
+                            list="local-invoices-list"
+                        />
+                        <datalist id="local-invoices-list">
+                            <option v-for="inv in local_invoices" :key="inv.id" :value="inv.invoice_number.replace('INV-', '')"></option>
+                        </datalist>
                     </FormField>
                 </div>
 
@@ -307,7 +469,7 @@ const statuses = [{label: 'All Status', value: 'all'}, {label: 'Paid', value: 'p
 
                 <div class="grid grid-cols-2 gap-4">
                     <FormField label="Container / Shipment # (Optional)" :error="form.errors.container_number">
-                        <TextInput v-model="form.container_number" placeholder="CN-123456" />
+                        <TextInput v-model="form.container_number" prefix="CN-" placeholder="123456" />
                     </FormField>
                     <FormField label="Shipping Status" :error="form.errors.shipping_status" required>
                         <SelectInput v-model="form.shipping_status" :options="shippingStatuses.map(s => ({label: s, value: s}))" />
@@ -333,10 +495,93 @@ const statuses = [{label: 'All Status', value: 'all'}, {label: 'Paid', value: 'p
                 <div class="pt-6 flex justify-end gap-3 border-t border-slate-100 mt-6">
                     <SecondaryButton @click="showAddModal = false" type="button">Cancel</SecondaryButton>
                     <PrimaryButton :loading="form.processing" :disabled="form.processing">
-                        Create EXP Invoice
+                        {{ editingSale ? 'Save Changes' : 'Create EXP Invoice' }}
                     </PrimaryButton>
                 </div>
             </form>
+        </SideModal>
+
+        <!-- Add Payment Modal -->
+        <SideModal :show="showPaymentModal" title="Record Payment" @close="showPaymentModal = false">
+            <form @submit.prevent="submitPayment" class="space-y-5 p-2">
+                <div class="bg-indigo-50 border border-indigo-100 p-4 rounded-2xl mb-4">
+                    <p class="text-xs font-bold text-indigo-800 uppercase tracking-widest mb-1">Invoice Info</p>
+                    <p class="text-lg font-black text-indigo-900">{{ paymentSale?.invoice_number }}</p>
+                    <p class="text-sm font-medium text-indigo-700 mt-1">Remaining Due: {{ formatCurrency(paymentSale?.due_amount) }}</p>
+                </div>
+
+                <FormField label="Payment Date" :error="paymentForm.errors.payment_date" required>
+                    <TextInput v-model="paymentForm.payment_date" type="date" />
+                </FormField>
+
+                <FormField label="Payment Amount (AED)" :error="paymentForm.errors.payment_amount" required>
+                    <TextInput v-model="paymentForm.payment_amount" type="number" step="0.01" prefix="AED" placeholder="0.00" />
+                </FormField>
+
+                <FormField label="Deposit to Account" :error="paymentForm.errors.bank_id" required>
+                    <SelectInput 
+                        v-model="paymentForm.bank_id" 
+                        :options="banks.map(b => ({ label: b.name, value: b.id }))" 
+                        placeholder="Select Bank/Cash Account..."
+                    />
+                </FormField>
+
+                <div class="pt-6 flex justify-end gap-3 border-t border-slate-100 mt-6">
+                    <SecondaryButton @click="showPaymentModal = false" type="button">Cancel</SecondaryButton>
+                    <PrimaryButton :loading="paymentForm.processing" :disabled="paymentForm.processing">
+                        Confirm Payment
+                    </PrimaryButton>
+                </div>
+            </form>
+        </SideModal>
+
+        <!-- Payment History Modal -->
+        <SideModal :show="showHistoryModal" title="Payment History" @close="showHistoryModal = false">
+            <div class="space-y-6">
+                <div class="p-6 bg-slate-50 border border-slate-200 rounded-[2rem]">
+                    <h4 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Invoice Timeline</h4>
+                    
+                    <div v-if="!historySale?.payments?.length" class="text-center py-10 text-slate-400 italic">
+                        No payments recorded yet.
+                    </div>
+
+                    <div v-else class="relative space-y-8">
+                        <!-- Vertical Line -->
+                        <div class="absolute left-4 top-2 bottom-2 w-0.5 bg-slate-200"></div>
+
+                        <div v-for="payment in historySale.payments" :key="payment.id" class="relative pl-12">
+                            <!-- Dot -->
+                            <div class="absolute left-[13px] top-1.5 w-2.5 h-2.5 rounded-full bg-indigo-600 border-2 border-white shadow-sm shadow-indigo-200"></div>
+                            
+                            <div class="flex flex-col gap-1">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-lg font-black text-slate-900">{{ formatCurrency(payment.amount) }}</span>
+                                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{{ payment.date }}</span>
+                                </div>
+                                <div class="flex items-center gap-2 text-xs font-bold text-indigo-600">
+                                    <span class="material-symbols-outlined text-[14px]">account_balance</span>
+                                    {{ payment.bank?.name || 'Cash Account' }}
+                                </div>
+                                <p v-if="payment.note" class="text-[11px] text-slate-500 mt-1 italic">{{ payment.note }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="p-5 bg-emerald-50 border border-emerald-100 rounded-2xl">
+                        <p class="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-1">Total Paid</p>
+                        <p class="text-xl font-black text-emerald-900">{{ formatCurrency(historySale?.paid_amount) }}</p>
+                    </div>
+                    <div class="p-5 bg-rose-50 border border-rose-100 rounded-2xl">
+                        <p class="text-[9px] font-black text-rose-600 uppercase tracking-widest mb-1">Balance Due</p>
+                        <p class="text-xl font-black text-rose-900">{{ formatCurrency(historySale?.due_amount) }}</p>
+                    </div>
+                </div>
+            </div>
+            <template #footer>
+                <PrimaryButton @click="showHistoryModal = false" class="w-full">Close History</PrimaryButton>
+            </template>
         </SideModal>
     </div>
 </template>

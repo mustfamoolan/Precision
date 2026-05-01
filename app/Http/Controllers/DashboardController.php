@@ -14,25 +14,35 @@ use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
+        $startDate = $request->input('start_date');
+        $endDate = $request->input('end_date');
+
+        if ($startDate && $endDate) {
+            $start = Carbon::parse($startDate)->startOfDay();
+            $end = Carbon::parse($endDate)->endOfDay();
+        } else {
+            // Default to current month (resets on the 1st of every month)
+            $start = Carbon::now()->startOfMonth();
+            $end = Carbon::now()->endOfMonth();
+        }
+
         $now = Carbon::now();
         $today = Carbon::today();
         
-        // Revenue (Sales) this month
-        $monthlySales = Sale::whereMonth('date', $now->month)
-            ->whereYear('date', $now->year)
+        // Revenue (Sales) in period
+        $monthlySales = Sale::whereBetween('date', [$start, $end])
             ->sum('amount');
             
-        // Expenses this month
-        $monthlyExpenses = Expense::whereMonth('date', $now->month)
-            ->whereYear('date', $now->year)
+        // Expenses in period
+        $monthlyExpenses = Expense::whereBetween('date', [$start, $end])
             ->sum('amount');
             
         // Net Profit
         $netProfit = $monthlySales - $monthlyExpenses;
         
-        // All Bank Balances
+        // All Bank Balances (Real-time, usually not filtered by date unless requested, but let's keep it as is for liquidity)
         $banks = Bank::all(['id', 'name', 'balance']);
         $totalBankCash = $banks->sum('balance');
         $bankLiquidity = $banks->filter(fn($b) => !str_contains(strtolower($b->name), 'cash'))->sum('balance');
@@ -44,44 +54,23 @@ class DashboardController extends Controller
             ->whereBetween('due_date', [$today, $today->copy()->addDays(5)])
             ->count();
             
-        // Latest 5 Sales
+        // Latest 10 Sales
         $recentSales = Sale::latest('date')
-            ->limit(5)
+            ->limit(10)
             ->get();
             
-        // Growth calc
-        $lastMonth = Carbon::now()->subMonth();
-        $lastMonthSales = Sale::whereMonth('date', $lastMonth->month)
-            ->whereYear('date', $lastMonth->year)
+        // Growth calc (Compared to previous period)
+        $periodDays = $start->diffInDays($end) + 1;
+        $prevStart = $start->copy()->subDays($periodDays);
+        $prevEnd = $start->copy()->subDay();
+
+        $prevSales = Sale::whereBetween('date', [$prevStart, $prevEnd])
             ->sum('amount');
             
         $salesGrowth = 0;
-        if ($lastMonthSales > 0) {
-            $salesGrowth = (($monthlySales - $lastMonthSales) / $lastMonthSales) * 100;
+        if ($prevSales > 0) {
+            $salesGrowth = (($monthlySales - $prevSales) / $prevSales) * 100;
         }
-
-        // --- CHART DATA ---
-        
-        // 1. Last 7 Days Sales Trend
-        $dailySales = [];
-        for ($i = 6; $i >= 0; $i--) {
-            $date = Carbon::now()->subDays($i)->format('Y-m-d');
-            $dayName = Carbon::now()->subDays($i)->format('D');
-            $amount = Sale::whereDate('date', $date)->sum('amount');
-            $dailySales[] = [
-                'day' => $dayName,
-                'amount' => (float)$amount,
-            ];
-        }
-
-        // 2. Expense Distribution (Top 5 descriptions)
-        $expenseBreakdown = Expense::select('description', DB::raw('SUM(amount) as total'))
-            ->whereMonth('date', $now->month)
-            ->whereYear('date', $now->year)
-            ->groupBy('description')
-            ->orderByDesc('total')
-            ->limit(4)
-            ->get();
 
         return Inertia::render('Dashboard', [
             'stats' => [
@@ -94,10 +83,10 @@ class DashboardController extends Controller
                 'sales_growth' => round($salesGrowth, 1),
                 'active_shipments' => $activeShipments,
                 'upcoming_cheques' => $upcomingCheques,
-            ],
-            'chart_data' => [
-                'daily_sales' => $dailySales,
-                'expense_breakdown' => $expenseBreakdown,
+                'filters' => [
+                    'start_date' => $start->format('Y-m-d'),
+                    'end_date' => $end->format('Y-m-d'),
+                ]
             ],
             'banks' => $banks,
             'recent_sales' => $recentSales,

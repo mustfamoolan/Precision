@@ -41,10 +41,17 @@ const form = useForm({
 });
 
 const submit = () => {
+    // Determine payment method string for backend from selected bank
+    const selectedBank = props.banks.find(b => b.id === form.bank_id);
+    form.payment_method = selectedBank ? selectedBank.name : 'Cash';
+
     form.post('/expenses', {
         onSuccess: () => {
             showAddModal.value = false;
             form.reset();
+            form.date = new Date().toISOString().substr(0, 10);
+            form.payment_method = 'Cash';
+            form.status = 'Paid';
         },
     });
 };
@@ -346,7 +353,7 @@ const statuses = ['Paid', 'Partial', 'Unpaid'];
                         <TextInput v-model="form.date" type="date" />
                     </FormField>
                     <FormField label="Expense #" :error="form.errors.expense_number">
-                        <TextInput v-model="form.expense_number" placeholder="EXP-1000" />
+                        <TextInput v-model="form.expense_number" prefix="EXP-" placeholder="1000" />
                     </FormField>
                 </div>
 
@@ -373,17 +380,17 @@ const statuses = ['Paid', 'Partial', 'Unpaid'];
                 </div>
 
                 <div class="grid grid-cols-2 gap-4">
-                    <FormField label="Payment Method" :error="form.errors.payment_method" required>
-                        <SelectInput v-model="form.payment_method" :options="paymentMethods.map(m => ({label: m, value: m}))" />
+                    <FormField label="Payment Method" :error="form.errors.bank_id" required>
+                        <SelectInput 
+                            v-model="form.bank_id" 
+                            :options="banks.map(b => ({label: b.name, value: b.id}))" 
+                            placeholder="Select Payment Source..."
+                        />
                     </FormField>
                     <FormField label="Status" :error="form.errors.status" required>
                         <SelectInput v-model="form.status" :options="statuses.map(s => ({label: s, value: s}))" />
                     </FormField>
                 </div>
-
-                <FormField label="Bank Account (Optional)" :error="form.errors.bank_id">
-                    <SelectInput v-model="form.bank_id" :options="[{label: 'None', value: ''}, ...banks.map(b => ({label: b.name, value: b.id}))]" />
-                </FormField>
 
                 <div class="pt-6 flex justify-end gap-3 border-t border-slate-100 mt-6">
                     <SecondaryButton @click="showAddModal = false" type="button">Cancel</SecondaryButton>

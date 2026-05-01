@@ -23,8 +23,15 @@ const showItemForm = ref(false);
 const itemForm = useForm({
   product_name: '',
   quantity: 1,
-  type: ''
+  cost: '',
+  currency: 'USD'
 });
+
+const currencies = [
+    { label: 'USD ($)', value: 'USD' },
+    { label: 'AED (د.إ)', value: 'AED' },
+    { label: 'IQD (ع.د)', value: 'IQD' },
+];
 
 const showPaymentForm = ref(false);
 const paymentForm = useForm({
@@ -86,7 +93,7 @@ const exportPDF = async () => {
   y += 10;
   doc.setFontSize(12); doc.setTextColor(0, 0, 0); doc.text('PACKING LIST', 14, y); y += 10;
   (s.items || []).forEach(item => {
-    doc.text(`${item.product_name} x ${item.quantity} (${item.type || 'N/A'})`, 14, y); y += 7;
+    doc.text(`${item.product_name} x ${item.quantity} (${item.cost || '0'} ${item.currency || 'USD'})`, 14, y); y += 7;
   });
 
   doc.save(`shipment-${s.container_number}.pdf`);
@@ -176,7 +183,8 @@ const exportPDF = async () => {
                                 <tr class="bg-surface-container-low/30 text-lg font-bold text-outline uppercase tracking-widest border-b border-outline-variant/20">
                                     <th class="py-5 px-6">Product Description</th>
                                     <th class="py-5 px-6">Qty</th>
-                                    <th class="py-5 px-6">Type</th>
+                                    <th class="py-5 px-6">Cost</th>
+                                    <th class="py-5 px-6">Currency</th>
                                     <th class="py-5 px-6 text-right">Actions</th>
                                 </tr>
                             </thead>
@@ -184,8 +192,9 @@ const exportPDF = async () => {
                                 <tr v-for="item in shipment.items" :key="item.id" class="hover:bg-surface-container-low/30 transition-colors">
                                     <td class="py-6 px-6 text-xl font-bold text-on-surface">{{ item.product_name }}</td>
                                     <td class="py-6 px-6 text-2xl font-black text-on-surface">{{ item.quantity }}</td>
+                                    <td class="py-6 px-6 text-xl font-bold text-primary">{{ item.cost || '0.00' }}</td>
                                     <td class="py-6 px-6">
-                                        <span class="px-4 py-1.5 rounded bg-surface-container-low text-sm font-bold text-outline uppercase">{{ item.type || 'N/A' }}</span>
+                                        <span class="px-4 py-1.5 rounded bg-surface-container-low text-sm font-black text-outline uppercase tracking-widest">{{ item.currency || 'USD' }}</span>
                                     </td>
                                     <td class="py-4 px-6 text-right">
                                         <button @click="deleteItem(item.id)" class="text-outline hover:text-error transition-colors">
@@ -194,7 +203,7 @@ const exportPDF = async () => {
                                     </td>
                                 </tr>
                                 <tr v-if="!shipment.items.length">
-                                    <td colspan="4" class="py-12 text-center text-outline text-xs italic">Packing list is currently empty.</td>
+                                    <td colspan="5" class="py-12 text-center text-outline text-xs italic">Packing list is currently empty.</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -330,13 +339,16 @@ const exportPDF = async () => {
                     <FormField label="Quantity" required>
                         <TextInput v-model="itemForm.quantity" type="number" min="1" />
                     </FormField>
-                    <FormField label="Type">
-                        <TextInput v-model="itemForm.type" placeholder="e.g. LED TV" />
+                    <FormField label="Cost">
+                        <TextInput v-model="itemForm.cost" type="number" step="0.01" placeholder="0.00" />
                     </FormField>
                 </div>
-                <div class="flex justify-end gap-3 pt-4">
+                <FormField label="Currency">
+                    <SelectInput v-model="itemForm.currency" :options="currencies" />
+                </FormField>
+                <div class="flex justify-end gap-3 pt-4 border-t border-outline-variant/10 mt-6">
                     <SecondaryButton @click="showItemForm = false" type="button">Cancel</SecondaryButton>
-                    <PrimaryButton :loading="itemForm.processing">Add Item</PrimaryButton>
+                    <PrimaryButton :loading="itemForm.processing">Add to Packing List</PrimaryButton>
                 </div>
             </form>
         </SideModal>
@@ -359,7 +371,7 @@ const exportPDF = async () => {
                 <FormField label="Notes">
                     <TextInput v-model="paymentForm.note" />
                 </FormField>
-                <div class="flex justify-end gap-3 pt-4">
+                <div class="flex justify-end gap-3 pt-4 border-t border-outline-variant/10 mt-6">
                     <SecondaryButton @click="showPaymentForm = false" type="button">Cancel</SecondaryButton>
                     <PrimaryButton :loading="paymentForm.processing" class="!bg-emerald-600">Confirm Payment</PrimaryButton>
                 </div>
@@ -367,3 +379,8 @@ const exportPDF = async () => {
         </SideModal>
     </div>
 </template>
+
+<style scoped>
+.font-black { font-weight: 900; }
+.tracking-tight { letter-spacing: -0.025em; }
+</style>

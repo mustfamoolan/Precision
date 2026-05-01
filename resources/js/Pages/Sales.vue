@@ -30,6 +30,9 @@ const editingSale = ref(null);
 const showPaymentModal = ref(false);
 const paymentSale = ref(null);
 
+const showHistoryModal = ref(false);
+const historySale = ref(null);
+
 const search = ref(props.filters.search || '');
 const startDate = ref(props.filters.start_date || '');
 const endDate = ref(props.filters.end_date || '');
@@ -48,13 +51,14 @@ const form = useForm({
 const paymentForm = useForm({
     payment_amount: '',
     payment_date: new Date().toISOString().substr(0, 10),
+    bank_id: '',
 });
 
 const openModal = (sale = null) => {
     if (sale) {
         editingSale.value = sale;
         form.date = sale.date;
-        form.invoice_number = sale.invoice_number;
+        form.invoice_number = sale.invoice_number ? sale.invoice_number.replace('INV-', '') : '';
         form.customer_name = sale.customer_name;
         form.amount = sale.amount;
         form.type = sale.type;
@@ -73,7 +77,13 @@ const openPaymentModal = (sale) => {
     paymentSale.value = sale;
     paymentForm.payment_amount = sale.due_amount > 0 ? sale.due_amount : '';
     paymentForm.payment_date = new Date().toISOString().substr(0, 10);
+    paymentForm.bank_id = sale.bank_id || '';
     showPaymentModal.value = true;
+};
+
+const openHistoryModal = (sale) => {
+    historySale.value = sale;
+    showHistoryModal.value = true;
 };
 
 const submitPayment = () => {
@@ -92,12 +102,22 @@ const confirmDelete = (id) => {
 };
 
 const submit = () => {
+    // Ensure invoice number starts with INV-
+    let originalInvoiceNumber = form.invoice_number;
+    if (form.invoice_number && !form.invoice_number.toString().startsWith('INV-')) {
+        form.invoice_number = 'INV-' + form.invoice_number;
+    }
+
     if (editingSale.value) {
         form.put(`/sales/${editingSale.value.id}`, {
             onSuccess: () => {
                 showModal.value = false;
                 form.reset();
             },
+            onError: () => {
+                // Restore original value if there's an error so user can fix it without double prefix
+                form.invoice_number = originalInvoiceNumber;
+            }
         });
     } else {
         form.post('/sales', {
@@ -105,6 +125,9 @@ const submit = () => {
                 showModal.value = false;
                 form.reset();
             },
+            onError: () => {
+                form.invoice_number = originalInvoiceNumber;
+            }
         });
     }
 };
@@ -375,6 +398,9 @@ const statuses = [{label: 'All Status', value: 'all'}, {label: 'Paid', value: 'p
                             </td>
                             <td class="py-5 px-8 text-center whitespace-nowrap">
                                 <div class="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button @click="openHistoryModal(sale)" class="w-8 h-8 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-100 hover:scale-110 transition-all shadow-sm" title="Payment History">
+                                        <span class="material-symbols-outlined text-[16px]">history</span>
+                                    </button>
                                     <button @click="openPaymentModal(sale)" class="w-8 h-8 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 hover:bg-emerald-100 hover:scale-110 transition-all shadow-sm" title="Record Payment">
                                         <span class="material-symbols-outlined text-[16px]">payments</span>
                                     </button>
@@ -415,6 +441,14 @@ const statuses = [{label: 'All Status', value: 'all'}, {label: 'Paid', value: 'p
                     <TextInput v-model="paymentForm.payment_amount" type="number" step="0.01" prefix="AED" placeholder="0.00" />
                 </FormField>
 
+                <FormField label="Deposit to Account" :error="paymentForm.errors.bank_id" required>
+                    <SelectInput 
+                        v-model="paymentForm.bank_id" 
+                        :options="banks.map(b => ({ label: b.name, value: b.id }))" 
+                        placeholder="Select Bank/Cash Account..."
+                    />
+                </FormField>
+
                 <div class="pt-6 flex justify-end gap-3 border-t border-slate-100 mt-6">
                     <SecondaryButton @click="showPaymentModal = false" type="button">Cancel</SecondaryButton>
                     <PrimaryButton :loading="paymentForm.processing" :disabled="paymentForm.processing">
@@ -422,6 +456,55 @@ const statuses = [{label: 'All Status', value: 'all'}, {label: 'Paid', value: 'p
                     </PrimaryButton>
                 </div>
             </form>
+        </SideModal>
+
+        <!-- Payment History Modal -->
+        <SideModal :show="showHistoryModal" title="Payment History" @close="showHistoryModal = false">
+            <div class="space-y-6">
+                <div class="p-6 bg-slate-50 border border-slate-200 rounded-[2rem]">
+                    <h4 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Invoice Timeline</h4>
+                    
+                    <div v-if="!historySale?.payments?.length" class="text-center py-10 text-slate-400 italic">
+                        No payments recorded yet.
+                    </div>
+
+                    <div v-else class="relative space-y-8">
+                        <!-- Vertical Line -->
+                        <div class="absolute left-4 top-2 bottom-2 w-0.5 bg-slate-200"></div>
+
+                        <div v-for="payment in historySale.payments" :key="payment.id" class="relative pl-12">
+                            <!-- Dot -->
+                            <div class="absolute left-[13px] top-1.5 w-2.5 h-2.5 rounded-full bg-indigo-600 border-2 border-white shadow-sm shadow-indigo-200"></div>
+                            
+                            <div class="flex flex-col gap-1">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-lg font-black text-slate-900">{{ formatCurrency(payment.amount) }}</span>
+                                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{{ payment.date }}</span>
+                                </div>
+                                <div class="flex items-center gap-2 text-xs font-bold text-indigo-600">
+                                    <span class="material-symbols-outlined text-[14px]">account_balance</span>
+                                    {{ payment.bank?.name || 'Cash Account' }}
+                                </div>
+                                <p v-if="payment.note" class="text-[11px] text-slate-500 mt-1 italic">{{ payment.note }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="p-5 bg-emerald-50 border border-emerald-100 rounded-2xl">
+                        <p class="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-1">Total Paid</p>
+                        <p class="text-xl font-black text-emerald-900">{{ formatCurrency(historySale?.paid_amount) }}</p>
+                    </div>
+                    <div class="p-5 bg-rose-50 border border-rose-100 rounded-2xl">
+                        <p class="text-[9px] font-black text-rose-600 uppercase tracking-widest mb-1">Balance Due</p>
+                        <p class="text-xl font-black text-rose-900">{{ formatCurrency(historySale?.due_amount) }}</p>
+                    </div>
+                </div>
+            </div>
+            <template #footer>
+                <PrimaryButton @click="showHistoryModal = false" class="w-full">Close History</PrimaryButton>
+            </template>
         </SideModal>
 
         <!-- Add/Edit Modal -->
@@ -433,7 +516,7 @@ const statuses = [{label: 'All Status', value: 'all'}, {label: 'Paid', value: 'p
                     </FormField>
                     
                     <FormField label="Invoice #" :error="form.errors.invoice_number" required>
-                        <TextInput v-model="form.invoice_number" placeholder="INV-1000" />
+                        <TextInput v-model="form.invoice_number" prefix="INV-" placeholder="1000" />
                     </FormField>
                 </div>
 

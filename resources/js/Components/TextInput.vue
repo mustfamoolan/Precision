@@ -46,12 +46,13 @@ defineExpose({ focus: () => input.value.focus() });
             :type="type"
             :class="[
                 'w-full bg-surface-container-highest border rounded-lg py-3 text-sm font-body text-on-surface placeholder:text-outline focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all',
-                prefix ? 'pl-8 pr-4' : 'px-4',
+                prefix ? 'pl-14 pr-4' : 'px-4',
                 error ? 'border-error' : 'border-outline-variant/20'
             ]"
             :value="modelValue"
             @input="$emit('update:modelValue', $event.target.value)"
             ref="input"
+            v-bind="$attrs"
             :placeholder="placeholder"
         />
     </div>

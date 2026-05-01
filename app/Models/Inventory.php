@@ -18,7 +18,13 @@ class Inventory extends Model
         'warehouse_quantity',
         'remote_quantity',
         'low_stock_threshold',
+        'brand_id',
     ];
+
+    public function brand()
+    {
+        return $this->belongsTo(Brand::class);
+    }
 
     /**
      * Total quantity across all locations.
