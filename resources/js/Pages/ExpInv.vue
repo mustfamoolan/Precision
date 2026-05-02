@@ -77,7 +77,7 @@ const openHistoryModal = (sale) => {
 const openEditModal = (sale) => {
     editingSale.value = sale;
     form.date = sale.date;
-    form.invoice_number = sale.invoice_number ? sale.invoice_number.replace('INV-', '') : '';
+    form.invoice_number = sale.invoice_number ? sale.invoice_number.replace('EXP-', '') : '';
     form.customer_name = sale.customer_name;
     form.amount = sale.amount;
     form.type = 'export';
@@ -108,8 +108,8 @@ const submitPayment = () => {
 
 const submit = () => {
     // Add prefix if not already there
-    if (form.invoice_number && !form.invoice_number.startsWith('INV-')) {
-        form.invoice_number = 'INV-' + form.invoice_number;
+    if (form.invoice_number && !form.invoice_number.startsWith('EXP-')) {
+        form.invoice_number = 'EXP-' + form.invoice_number;
     }
 
     if (editingSale.value) {
@@ -449,13 +449,9 @@ const exportInvoicePDF = (sale) => {
                     <FormField label="Invoice #" :error="form.errors.invoice_number" required>
                         <TextInput 
                             v-model="form.invoice_number" 
-                            prefix="INV-" 
-                            placeholder="Select or type..." 
-                            list="local-invoices-list"
+                            prefix="EXP-" 
+                            placeholder="Enter invoice number..." 
                         />
-                        <datalist id="local-invoices-list">
-                            <option v-for="inv in local_invoices" :key="inv.id" :value="inv.invoice_number.replace('INV-', '')"></option>
-                        </datalist>
                     </FormField>
                 </div>
 
