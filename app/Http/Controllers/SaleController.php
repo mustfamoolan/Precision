@@ -37,10 +37,10 @@ class SaleController extends Controller
         }
 
         if ($request->filled('search')) {
-            $query->where(function($q) use ($request) {
+            $query->where(function ($q) use ($request) {
                 $q->where('customer_name', 'like', '%' . $request->search . '%')
-                  ->orWhere('invoice_number', 'like', '%' . $request->search . '%')
-                  ->orWhere('container_number', 'like', '%' . $request->search . '%');
+                    ->orWhere('invoice_number', 'like', '%' . $request->search . '%')
+                    ->orWhere('container_number', 'like', '%' . $request->search . '%');
             });
         }
 
@@ -49,7 +49,7 @@ class SaleController extends Controller
         }
 
         $sales = $query->with(['payments.bank', 'bank'])->latest('date')->get();
-        
+
         // Summary Data for the current view
         $totalAmount = $query->sum('amount');
         $totalPaid = $query->sum('paid_amount');
@@ -92,12 +92,12 @@ class SaleController extends Controller
         ]);
 
         $validated['paid_amount'] = $validated['paid_amount'] ?? 0;
-        
+        $validated['container_number'] = $validated['container_number'] ?? null;
         if ($validated['container_number'] && !str_starts_with($validated['container_number'], 'CN-')) {
             $validated['container_number'] = 'CN-' . $validated['container_number'];
         }
         $validated['due_amount'] = $validated['amount'] - $validated['paid_amount'];
-        
+
         if ($validated['due_amount'] <= 0) {
             $validated['status'] = 'paid';
         } elseif ($validated['paid_amount'] > 0) {
@@ -140,12 +140,12 @@ class SaleController extends Controller
         ]);
 
         $validated['paid_amount'] = $validated['paid_amount'] ?? 0;
-
+        $validated['container_number'] = $validated['container_number'] ?? null;
         if ($validated['container_number'] && !str_starts_with($validated['container_number'], 'CN-')) {
             $validated['container_number'] = 'CN-' . $validated['container_number'];
         }
         $validated['due_amount'] = $validated['amount'] - $validated['paid_amount'];
-        
+
         if ($validated['due_amount'] <= 0) {
             $validated['status'] = 'paid';
         } elseif ($validated['paid_amount'] > 0) {
