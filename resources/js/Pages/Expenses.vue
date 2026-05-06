@@ -56,6 +56,12 @@ const submit = () => {
     });
 };
 
+const confirmDelete = (id) => {
+    if (confirm('Are you sure you want to delete this expense?')) {
+        router.delete(`/expenses/${id}`);
+    }
+};
+
 const handleSearch = () => {
     router.get('/expenses', { 
         search: search.value,
@@ -145,7 +151,7 @@ const exportPDF = () => {
         
         addRow([
             expense.date, 
-            expense.expense_number || `EXP-${1000 + expense.id}`, 
+            expense.expense_number || expense.id, 
             desc, 
             expense.category, 
             supp, 
@@ -313,7 +319,7 @@ const statuses = ['Paid', 'Partial', 'Unpaid'];
                     <tbody class="divide-y divide-slate-50">
                         <tr v-for="expense in expenses" :key="expense.id" class="group hover:bg-slate-50/50 transition-colors">
                             <td class="py-6 px-8 text-xl font-bold text-slate-500 whitespace-nowrap">{{ expense.date }}</td>
-                            <td class="py-6 px-8 text-xl font-bold text-slate-900 whitespace-nowrap">{{ expense.expense_number || 'EXP-' + (1000 + expense.id) }}</td>
+                            <td class="py-6 px-8 text-xl font-bold text-slate-900 whitespace-nowrap">{{ expense.expense_number || expense.id }}</td>
                             <td class="py-6 px-8 text-xl font-medium text-slate-600 min-w-[200px]">{{ expense.description }}</td>
                             <td class="py-6 px-8 whitespace-nowrap">
                                 <span class="px-5 py-2 rounded-full text-base font-black uppercase tracking-widest bg-slate-100 text-slate-600">{{ expense.category }}</span>
@@ -328,7 +334,7 @@ const statuses = ['Paid', 'Partial', 'Unpaid'];
                             </td>
                             <td class="py-5 px-8 text-center whitespace-nowrap">
                                 <div class="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <button @click="router.delete(`/expenses/${expense.id}`)" class="w-8 h-8 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-rose-500 hover:border-rose-200 hover:bg-rose-50 transition-all shadow-sm">
+                                    <button @click="confirmDelete(expense.id)" class="w-8 h-8 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-rose-500 hover:border-rose-200 hover:bg-rose-50 transition-all shadow-sm">
                                         <span class="material-symbols-outlined text-[16px]">delete</span>
                                     </button>
                                 </div>
@@ -352,9 +358,12 @@ const statuses = ['Paid', 'Partial', 'Unpaid'];
                     <FormField label="Date" :error="form.errors.date" required>
                         <TextInput v-model="form.date" type="date" />
                     </FormField>
-                    <FormField label="Expense #" :error="form.errors.expense_number">
-                        <TextInput v-model="form.expense_number" prefix="EXP-" placeholder="1000" />
-                    </FormField>
+                    <div class="flex flex-col justify-center">
+                        <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Expense #</span>
+                        <div class="px-4 py-3 bg-slate-50 border border-dashed border-slate-300 rounded-2xl text-xs font-bold text-slate-400 italic">
+                            Auto-generated
+                        </div>
+                    </div>
                 </div>
 
                 <FormField label="Description" :error="form.errors.description" required>

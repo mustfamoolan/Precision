@@ -40,7 +40,9 @@ const clearAll = () => {
 };
 
 const destroy = (id) => {
-    router.delete(`/notifications/${id}`, { preserveScroll: true });
+    if (confirm('Are you sure you want to delete this notification?')) {
+        router.delete(`/notifications/${id}`, { preserveScroll: true });
+    }
 };
 
 const formatTime = (dateString) => {

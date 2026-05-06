@@ -22,7 +22,7 @@ const props = defineProps({
         type: Array,
         default: () => []
     },
-    local_invoices: {
+    inventory: {
         type: Array,
         default: () => []
     }
@@ -40,6 +40,9 @@ const paymentSale = ref(null);
 const showHistoryModal = ref(false);
 const historySale = ref(null);
 
+const showItemsModal = ref(false);
+const itemsSale = ref(null);
+
 const editingSale = ref(null);
 
 const form = useForm({
@@ -53,6 +56,7 @@ const form = useForm({
     container_number: '',
     shipping_status: 'On Board',
     bank_id: '',
+    items: [],
 });
 
 const paymentForm = useForm({
@@ -74,10 +78,15 @@ const openHistoryModal = (sale) => {
     showHistoryModal.value = true;
 };
 
+const openItemsModal = (sale) => {
+    itemsSale.value = sale;
+    showItemsModal.value = true;
+};
+
 const openEditModal = (sale) => {
     editingSale.value = sale;
     form.date = sale.date;
-    form.invoice_number = sale.invoice_number ? sale.invoice_number.replace('INV-', '') : '';
+    form.invoice_number = sale.invoice_number ? sale.invoice_number.replace('EXP-', '').replace('INV-', '') : '';
     form.customer_name = sale.customer_name;
     form.amount = sale.amount;
     form.type = 'export';
@@ -86,7 +95,23 @@ const openEditModal = (sale) => {
     form.container_number = sale.container_number ? sale.container_number.replace('CN-', '') : '';
     form.shipping_status = sale.shipping_status;
     form.bank_id = sale.bank_id || '';
+    form.items = sale.items || [];
     showAddModal.value = true;
+};
+
+const addItem = () => {
+    form.items.push({ inventory_id: '', name: '', quantity: 1 });
+};
+
+const removeItem = (index) => {
+    form.items.splice(index, 1);
+};
+
+const onInventorySelect = (index, invId) => {
+    const inv = props.inventory.find(i => i.id == invId);
+    if (inv) {
+        form.items[index].name = inv.name;
+    }
 };
 
 const openAddModal = () => {
@@ -106,10 +131,16 @@ const submitPayment = () => {
     });
 };
 
+const confirmDelete = (id) => {
+    if (confirm('Are you sure you want to delete this invoice?')) {
+        router.delete(`/sales/${id}`);
+    }
+};
+
 const submit = () => {
     // Add prefix if not already there
-    if (form.invoice_number && !form.invoice_number.startsWith('INV-')) {
-        form.invoice_number = 'INV-' + form.invoice_number;
+    if (form.invoice_number && !form.invoice_number.startsWith('EXP-')) {
+        form.invoice_number = 'EXP-' + form.invoice_number;
     }
 
     if (editingSale.value) {
@@ -198,8 +229,20 @@ const exportInvoicePDF = (sale) => {
     
     doc.line(15, 125, W - 15, 125);
     doc.setFont('helvetica', 'normal');
-    doc.text(`Export Sale - ${sale.container_number || 'General'}`, 20, 135);
-    doc.text(formatCurrency(sale.amount), W - 35, 135, { align: 'right' });
+    
+    let currentY = 135;
+    if (sale.items && sale.items.length > 0) {
+        sale.items.forEach((item, index) => {
+            doc.text(`${item.name} (Qty: ${item.quantity})`, 20, currentY);
+            if (index === 0) {
+                doc.text(formatCurrency(sale.amount), W - 35, currentY, { align: 'right' });
+            }
+            currentY += 10;
+        });
+    } else {
+        doc.text(`Export Sale - ${sale.container_number || 'General'}`, 20, currentY);
+        doc.text(formatCurrency(sale.amount), W - 35, currentY, { align: 'right' });
+    }
     
     // Totals
     const totalY = 160;
@@ -412,6 +455,9 @@ const exportInvoicePDF = (sale) => {
                                     <button @click="exportInvoicePDF(sale)" class="w-8 h-8 rounded-xl bg-slate-900 text-white flex items-center justify-center hover:bg-slate-800 hover:scale-110 transition-all shadow-md" title="Download PDF">
                                         <span class="material-symbols-outlined text-[16px]">picture_as_pdf</span>
                                     </button>
+                                    <button @click="openItemsModal(sale)" class="w-8 h-8 rounded-xl bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-600 hover:bg-indigo-100 hover:scale-110 transition-all shadow-sm" title="View Items">
+                                        <span class="material-symbols-outlined text-[16px]">inventory_2</span>
+                                    </button>
                                     <button @click="openHistoryModal(sale)" class="w-8 h-8 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-100 hover:scale-110 transition-all shadow-sm" title="Payment History">
                                         <span class="material-symbols-outlined text-[16px]">history</span>
                                     </button>
@@ -421,7 +467,7 @@ const exportInvoicePDF = (sale) => {
                                     <button @click="openEditModal(sale)" class="w-8 h-8 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-indigo-500 hover:border-indigo-200 hover:bg-indigo-50 transition-all shadow-sm" title="Edit">
                                         <span class="material-symbols-outlined text-[16px]">edit</span>
                                     </button>
-                                    <button @click="router.delete(`/sales/${sale.id}`)" class="w-8 h-8 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-rose-500 hover:border-rose-200 hover:bg-rose-50 transition-all shadow-sm" title="Delete">
+                                    <button @click="confirmDelete(sale.id)" class="w-8 h-8 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-rose-500 hover:border-rose-200 hover:bg-rose-50 transition-all shadow-sm" title="Delete">
                                         <span class="material-symbols-outlined text-[16px]">delete</span>
                                     </button>
                                 </div>
@@ -446,16 +492,12 @@ const exportInvoicePDF = (sale) => {
                         <TextInput v-model="form.date" type="date" />
                     </FormField>
                     
-                    <FormField label="Invoice #" :error="form.errors.invoice_number" required>
+                    <FormField label="Invoice Serial #" :error="form.errors.invoice_number" required>
                         <TextInput 
                             v-model="form.invoice_number" 
-                            prefix="INV-" 
-                            placeholder="Select or type..." 
-                            list="local-invoices-list"
+                            prefix="EXP-" 
+                            placeholder="Enter number (e.g. 101)" 
                         />
-                        <datalist id="local-invoices-list">
-                            <option v-for="inv in local_invoices" :key="inv.id" :value="inv.invoice_number.replace('INV-', '')"></option>
-                        </datalist>
                     </FormField>
                 </div>
 
@@ -491,6 +533,36 @@ const exportInvoicePDF = (sale) => {
                         :options="[{label: 'None / Cash', value: ''}, ...banks.map(b => ({ label: b.name, value: b.id }))]" 
                     />
                 </FormField>
+
+                <!-- Items Section -->
+                <div class="border-t border-slate-100 pt-5 mt-5">
+                    <div class="flex justify-between items-center mb-4">
+                        <h4 class="text-xs font-black text-slate-400 uppercase tracking-widest">Included Items (Optional)</h4>
+                        <button type="button" @click="addItem" class="text-[10px] font-black text-indigo-600 uppercase tracking-widest hover:underline">+ Add Item</button>
+                    </div>
+
+                    <div class="space-y-3">
+                        <div v-for="(item, index) in form.items" :key="index" class="flex gap-3 items-end bg-slate-50 p-3 rounded-xl border border-slate-100">
+                            <div class="flex-1">
+                                <label class="text-[9px] font-black text-slate-400 uppercase mb-1 block">Item from Warehouse</label>
+                                <SelectInput 
+                                    v-model="item.inventory_id" 
+                                    :options="inventory.map(i => ({ label: `${i.name} (${i.sku})`, value: i.id }))"
+                                    @update:modelValue="(val) => onInventorySelect(index, val)"
+                                    placeholder="Choose..."
+                                />
+                            </div>
+                            <div class="w-24">
+                                <label class="text-[9px] font-black text-slate-400 uppercase mb-1 block">Qty</label>
+                                <TextInput v-model="item.quantity" type="number" min="1" />
+                            </div>
+                            <button type="button" @click="removeItem(index)" class="mb-2 text-rose-500 hover:text-rose-700">
+                                <span class="material-symbols-outlined text-[20px]">delete</span>
+                            </button>
+                        </div>
+                        <div v-if="form.items.length === 0" class="text-center py-4 text-[10px] text-slate-400 italic">No items added. Click + Add Item to include warehouse stock on the invoice.</div>
+                    </div>
+                </div>
 
                 <div class="pt-6 flex justify-end gap-3 border-t border-slate-100 mt-6">
                     <SecondaryButton @click="showAddModal = false" type="button">Cancel</SecondaryButton>
@@ -581,6 +653,55 @@ const exportInvoicePDF = (sale) => {
             </div>
             <template #footer>
                 <PrimaryButton @click="showHistoryModal = false" class="w-full">Close History</PrimaryButton>
+            </template>
+        </SideModal>
+
+        <!-- View Items Modal -->
+        <SideModal :show="showItemsModal" title="Invoice Items" @close="showItemsModal = false">
+            <div class="space-y-6">
+                <div class="p-6 bg-slate-50 border border-slate-200 rounded-[2rem]">
+                    <h4 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">List of Items</h4>
+                    
+                    <div v-if="!itemsSale?.items?.length" class="text-center py-10 text-slate-400 italic">
+                        No items recorded for this invoice.
+                    </div>
+
+                    <div v-else class="space-y-4">
+                        <div v-for="(item, index) in itemsSale.items" :key="index" class="relative group">
+                            <!-- Background Decoration -->
+                            <div class="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-3xl opacity-10 group-hover:opacity-20 transition duration-300"></div>
+                            
+                            <div class="relative flex justify-between items-center p-5 bg-white rounded-3xl border border-slate-100 shadow-sm transition-all hover:shadow-md">
+                                <div class="flex items-center gap-5">
+                                    <!-- Icon with Gradient -->
+                                    <div class="w-14 h-14 bg-gradient-to-br from-indigo-500 to-indigo-700 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-indigo-100">
+                                        <span class="material-symbols-outlined text-2xl">package_2</span>
+                                    </div>
+                                    
+                                    <div>
+                                        <h5 class="text-lg font-black text-slate-900 leading-tight">{{ item.name || 'Unknown Product' }}</h5>
+                                        <div class="flex items-center gap-2 mt-1">
+                                            <span class="px-2 py-0.5 bg-slate-100 text-slate-500 rounded text-[9px] font-bold uppercase tracking-widest">
+                                                ID: #{{ item.inventory_id }}
+                                            </span>
+                                            <span class="w-1 h-1 bg-slate-300 rounded-full"></span>
+                                            <p class="text-[11px] font-bold text-indigo-600 uppercase tracking-widest">Qty: {{ item.quantity }}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Prominent Quantity Badge -->
+                                <div class="flex flex-col items-end gap-1">
+                                    <span class="text-2xl font-black text-slate-900 leading-none">{{ item.quantity }}</span>
+                                    <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Units</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <template #footer>
+                <PrimaryButton @click="showItemsModal = false" class="w-full">Close</PrimaryButton>
             </template>
         </SideModal>
     </div>

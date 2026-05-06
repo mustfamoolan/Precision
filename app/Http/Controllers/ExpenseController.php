@@ -85,8 +85,10 @@ class ExpenseController extends Controller
             'bank_id' => 'nullable|exists:banks,id',
         ]);
 
-        if ($validated['expense_number'] && !str_starts_with($validated['expense_number'], 'EXP-')) {
-            $validated['expense_number'] = 'EXP-' . $validated['expense_number'];
+        if (empty($validated['expense_number'])) {
+            $lastExpense = Expense::orderBy('id', 'desc')->first();
+            $nextId = $lastExpense ? ($lastExpense->id + 1) : 1;
+            $validated['expense_number'] = $nextId;
         }
 
         Expense::create($validated);

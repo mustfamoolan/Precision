@@ -23,7 +23,12 @@ class Sale extends Model
         'container_number', 
         'shipping_status',
         'bank_id',
-        'shipment_id'
+        'shipment_id',
+        'items'
+    ];
+
+    protected $casts = [
+        'items' => 'array'
     ];
 
     public function bank()

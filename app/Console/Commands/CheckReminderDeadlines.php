@@ -49,7 +49,7 @@ class CheckReminderDeadlines extends Command
                 $milestoneLabel = "OVERDUE by " . abs($daysUntil) . " days";
             } elseif ($daysUntil == 0) {
                 $milestoneLabel = "DUE TODAY";
-            } elseif ($daysUntil <= 3) {
+            } elseif ($daysUntil <= 5) {
                 $milestoneLabel = "due in $daysUntil days";
             }
 

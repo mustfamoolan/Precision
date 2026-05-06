@@ -15,7 +15,7 @@ const props = defineProps({
     customers: Array,
 });
 
-const activeTab = ref('employees'); // 'employees' or 'customers'
+const activeTab = ref('customers'); // 'employees' or 'customers'
 const showModal = ref(false);
 const editingContact = ref(null);
 

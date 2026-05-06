@@ -59,6 +59,11 @@ class DashboardController extends Controller
             ->limit(10)
             ->get();
             
+        // Latest 10 Expenses
+        $recentExpenses = Expense::latest('date')
+            ->limit(10)
+            ->get();
+            
         // Growth calc (Compared to previous period)
         $periodDays = $start->diffInDays($end) + 1;
         $prevStart = $start->copy()->subDays($periodDays);
@@ -90,6 +95,7 @@ class DashboardController extends Controller
             ],
             'banks' => $banks,
             'recent_sales' => $recentSales,
+            'recent_expenses' => $recentExpenses,
         ]);
     }
 }

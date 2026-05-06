@@ -10,6 +10,7 @@ const props = defineProps({
     stats: Object,
     banks: Array,
     recent_sales: Array,
+    recent_expenses: Array,
 });
 
 const showFilters = ref(false);
@@ -40,7 +41,7 @@ const getStatusVariant = (status) => {
 <template>
     <Head title="Dashboard" />
 
-    <div class="space-y-6 animate-in fade-in duration-700">
+    <div class="space-y-6 animate-in fade-in duration-700 pb-20">
         <!-- Page Header -->
         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
@@ -100,7 +101,7 @@ const getStatusVariant = (status) => {
             </div>
         </div>
 
-        <!-- Secondary Stats & Alerts Row -->
+        <!-- Secondary Stats Row -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <!-- Active Shipments -->
             <div class="bg-surface-container-lowest border border-outline-variant/20 p-6 rounded-2xl shadow-sm">
@@ -138,26 +139,52 @@ const getStatusVariant = (status) => {
             </div>
         </div>
 
-        <!-- Latest Sales List -->
-        <div class="bg-surface-container-lowest border border-outline-variant/20 rounded-2xl shadow-sm overflow-hidden flex flex-col pb-10">
-            <div class="p-6 border-b border-outline-variant/20 flex justify-between items-center">
-                <h3 class="text-xl font-headline font-bold text-on-surface uppercase tracking-widest">Latest 10 Sales Invoices</h3>
-                <Link href="/sales" class="text-[10px] font-bold text-primary hover:underline uppercase tracking-widest">
-                    View All Sales
-                </Link>
-            </div>
-            <div class="flex-1">
-                <div v-for="sale in recent_sales" :key="sale.id" class="p-6 border-b border-outline-variant/10 flex justify-between items-center hover:bg-surface-container-low transition-colors">
-                    <div class="min-w-0">
-                        <p class="text-xl font-bold text-on-surface truncate">{{ sale.customer_name }}</p>
-                        <p class="text-base text-outline mt-1">{{ sale.date }} • {{ sale.invoice_number }}</p>
-                    </div>
-                    <div class="text-right">
-                        <p class="text-2xl font-black text-on-surface">{{ formatCurrency(sale.amount) }}</p>
-                        <Badge :variant="getStatusVariant(sale.status)" class="!text-xs !px-3 !py-1 mt-1">{{ sale.status }}</Badge>
-                    </div>
+        <!-- Latest Transactions Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Latest Sales -->
+            <div class="bg-surface-container-lowest border border-outline-variant/20 rounded-2xl shadow-sm overflow-hidden flex flex-col">
+                <div class="p-6 border-b border-outline-variant/20 flex justify-between items-center">
+                    <h3 class="text-sm font-headline font-bold text-on-surface uppercase tracking-widest">Latest Sales</h3>
+                    <Link href="/sales" class="text-[10px] font-bold text-primary hover:underline uppercase tracking-widest">
+                        View All
+                    </Link>
                 </div>
-                <div v-if="recent_sales.length === 0" class="p-12 text-center text-sm text-outline">No recent activity.</div>
+                <div class="flex-1">
+                    <div v-for="sale in recent_sales" :key="sale.id" class="p-4 border-b border-outline-variant/10 flex justify-between items-center hover:bg-surface-container-low transition-colors">
+                        <div class="min-w-0">
+                            <p class="text-sm font-bold text-on-surface truncate">{{ sale.customer_name }}</p>
+                            <p class="text-[10px] text-outline mt-1">{{ sale.date }} • {{ sale.invoice_number }}</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-sm font-black text-on-surface">{{ formatCurrency(sale.amount) }}</p>
+                            <Badge :variant="getStatusVariant(sale.status)" class="!text-[9px] !px-2 !py-0.5 mt-1">{{ sale.status }}</Badge>
+                        </div>
+                    </div>
+                    <div v-if="recent_sales.length === 0" class="p-12 text-center text-xs text-outline italic">No recent sales.</div>
+                </div>
+            </div>
+
+            <!-- Latest Expenses -->
+            <div class="bg-surface-container-lowest border border-outline-variant/20 rounded-2xl shadow-sm overflow-hidden flex flex-col">
+                <div class="p-6 border-b border-outline-variant/20 flex justify-between items-center">
+                    <h3 class="text-sm font-headline font-bold text-on-surface uppercase tracking-widest text-error">Latest Expenses</h3>
+                    <Link href="/expenses" class="text-[10px] font-bold text-error hover:underline uppercase tracking-widest">
+                        View All
+                    </Link>
+                </div>
+                <div class="flex-1">
+                    <div v-for="expense in recent_expenses" :key="expense.id" class="p-4 border-b border-outline-variant/10 flex justify-between items-center hover:bg-surface-container-low transition-colors">
+                        <div class="min-w-0">
+                            <p class="text-sm font-bold text-on-surface truncate">{{ expense.description }}</p>
+                            <p class="text-[10px] text-outline mt-1">{{ expense.date }} • {{ expense.category }}</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-sm font-black text-error">{{ formatCurrency(expense.amount) }}</p>
+                            <p class="text-[9px] font-bold text-outline mt-1 uppercase">{{ expense.payment_method }}</p>
+                        </div>
+                    </div>
+                    <div v-if="recent_expenses.length === 0" class="p-12 text-center text-xs text-outline italic">No recent expenses.</div>
+                </div>
             </div>
         </div>
     </div>

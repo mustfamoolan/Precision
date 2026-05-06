@@ -72,7 +72,7 @@ class SaleController extends Controller
             ]),
             'banks' => Bank::all(['id', 'name']),
             'customers' => \App\Models\Customer::all(['id', 'name']),
-            'local_invoices' => Sale::where('type', 'local')->get(['id', 'invoice_number']),
+            'inventory' => \App\Models\Inventory::all(['id', 'name', 'sku']),
         ]);
     }
 
@@ -89,6 +89,7 @@ class SaleController extends Controller
             'container_number' => 'nullable|string',
             'shipping_status' => 'nullable|string',
             'bank_id' => 'nullable|exists:banks,id',
+            'items' => 'nullable|array',
         ]);
 
         $validated['paid_amount'] = $validated['paid_amount'] ?? 0;
@@ -107,18 +108,36 @@ class SaleController extends Controller
         }
 
         $sale = \App\Models\Sale::withoutEvents(function () use ($validated) {
+            // Safeguard: Ensure names are populated for items if missing
+            if (!empty($validated['items'])) {
+                foreach ($validated['items'] as &$item) {
+                    if (empty($item['name']) && !empty($item['inventory_id'])) {
+                        $inv = \App\Models\Inventory::find($item['inventory_id']);
+                        if ($inv) {
+                            $item['name'] = $inv->name;
+                        }
+                    }
+                }
+            }
             return \App\Models\Sale::create($validated);
         });
 
-        // If initial payment exists, create a SalePayment record
-        if ($sale->paid_amount > 0 && $sale->bank_id) {
-            \App\Models\SalePayment::create([
-                'sale_id' => $sale->id,
-                'bank_id' => $sale->bank_id,
-                'amount' => $sale->paid_amount,
-                'date' => $sale->date,
-                'note' => 'Initial payment upon creation'
-            ]);
+        // Log stock movements for items (for history tracking)
+        if (!empty($validated['items'])) {
+            foreach ($validated['items'] as $item) {
+                if (!empty($item['inventory_id'])) {
+                    \App\Models\StockMovement::create([
+                        'inventory_id' => $item['inventory_id'],
+                        'quantity' => $item['quantity'],
+                        'type' => 'out',
+                        'from_location' => 'Export Sale',
+                        'to_location' => $validated['customer_name'],
+                        'reference_type' => 'Sale',
+                        'reference_id' => $sale->id,
+                        'notes' => 'Export Invoice Sale: ' . $validated['invoice_number'] . ' (Documentation only)'
+                    ]);
+                }
+            }
         }
 
         return redirect()->back();
@@ -137,6 +156,7 @@ class SaleController extends Controller
             'container_number' => 'nullable|string',
             'shipping_status' => 'nullable|string',
             'bank_id' => 'nullable|exists:banks,id',
+            'items' => 'nullable|array',
         ]);
 
         $validated['paid_amount'] = $validated['paid_amount'] ?? 0;
@@ -152,6 +172,18 @@ class SaleController extends Controller
             $validated['status'] = 'partial';
         } else {
             $validated['status'] = 'pending';
+        }
+
+        // Safeguard: Ensure names are populated for items if missing
+        if (!empty($validated['items'])) {
+            foreach ($validated['items'] as &$item) {
+                if (empty($item['name']) && !empty($item['inventory_id'])) {
+                    $inv = \App\Models\Inventory::find($item['inventory_id']);
+                    if ($inv) {
+                        $item['name'] = $inv->name;
+                    }
+                }
+            }
         }
 
         \App\Models\Sale::withoutEvents(function () use ($sale, $validated) {

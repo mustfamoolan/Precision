@@ -89,7 +89,7 @@ const navItems = [
     { name: 'Sales', icon: 'payments', href: '/sales' },
     { name: 'EXP INV', icon: 'export_notes', href: '/sales?type=export' },
     { name: 'Expenses', icon: 'receipt_long', href: '/expenses' },
-    { name: 'Employees', icon: 'badge', href: '/employees' },
+    { name: 'Staff & Clients', icon: 'badge', href: '/employees' },
     { name: 'Inventory', icon: 'inventory_2', href: '/inventory' },
     { name: 'Reminders', icon: 'notifications_active', href: '/reminders' },
     { name: 'Notifications', icon: 'notifications', href: '/notifications' },

@@ -185,6 +185,55 @@ class InventoryController extends Controller
     }
 
     /**
+     * Adjust stock (Increase/Decrease)
+     */
+    public function adjust(Request $request, Inventory $inventory)
+    {
+        $validated = $request->validate([
+            'quantity' => 'required|integer|min:1',
+            'location' => 'required|in:shop,warehouse,remote',
+            'type' => 'required|in:in,out',
+            'notes' => 'nullable|string',
+        ]);
+
+        $field = $validated['location'] . '_quantity';
+
+        return DB::transaction(function () use ($inventory, $validated, $field) {
+            if ($validated['type'] === 'in') {
+                $inventory->$field += $validated['quantity'];
+            } else {
+                if ($inventory->$field < $validated['quantity']) {
+                    return redirect()->back()->withErrors(['quantity' => 'Insufficient stock in selected location.']);
+                }
+                $inventory->$field -= $validated['quantity'];
+            }
+            $inventory->save();
+
+            $this->logMovement(
+                $inventory->id, 
+                $validated['quantity'], 
+                $validated['type'], 
+                $validated['type'] === 'out' ? $validated['location'] : null, 
+                $validated['type'] === 'in' ? $validated['location'] : null, 
+                $validated['notes'] ?? 'Manual Adjustment'
+            );
+
+            return redirect()->back()->with('success', 'Stock adjusted successfully.');
+        });
+    }
+
+    /**
+     * Get history for a specific item.
+     */
+    public function history(Inventory $inventory)
+    {
+        return response()->json([
+            'item' => $inventory,
+            'movements' => StockMovement::where('inventory_id', $inventory->id)->latest()->get()
+        ]);
+    }
+
+    /**
      * Helper to log stock movements.
      */
     private function logMovement($inventoryId, $quantity, $type, $from, $to, $notes = null)

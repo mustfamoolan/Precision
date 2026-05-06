@@ -14,14 +14,10 @@ defineOptions({ layout: MainLayout });
 
 const props = defineProps({
     banks: Array,
-    bank1: Object,
-    bank2: Object,
-    cash: Object,
     transactions: Array,
     cash_log: Array,
     incoming_cheques: Array,
     outgoing_cheques: Array,
-    received_cheques: Array,
     employees: Array,
 });
 
@@ -43,10 +39,12 @@ const dateTo = ref('');
 // Forms
 const chequeForm = useForm({
     cheque_number: '',
-    party_name: '',
+    sender_name: '',
+    receiver_name: '',
     amount: '',
     due_date: new Date().toISOString().substr(0, 10),
     type: 'incoming',
+    bank_id: '',
 });
 
 const bankExpenseForm = useForm({
@@ -129,6 +127,11 @@ const submitBank = () => {
 const submitCheque = () => chequeForm.post('/cheques', { onSuccess: () => isChequeModalOpen.value = false });
 const submitBankExpense = () => bankExpenseForm.post('/banks/expense', { onSuccess: () => isExpenseModalOpen.value = false });
 const submitReceive = () => receiveForm.post(`/cheques/${selectedCheque.value.id}/receive`, { onSuccess: () => isReceiveModalOpen.value = false });
+const submitClear = (chequeId) => {
+    if (confirm('Are you sure you want to mark this cheque as cleared? This will update your bank balance.')) {
+        router.post(`/cheques/${chequeId}/clear`);
+    }
+};
 
 const formatDate = (date) => new Date(date).toLocaleDateString('en-AE', { day: '2-digit', month: 'short', year: 'numeric' });
 const formatPrice = (amount) => new Intl.NumberFormat('en-AE', { style: 'currency', currency: 'AED' }).format(amount || 0);
@@ -169,32 +172,31 @@ function pageRange(current, total) {
             </div>
         </div>
 
-        <!-- Accounts Overview (3 Cards) -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
+        <!-- Accounts Overview -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 mb-12">
             <!-- Bank Cards -->
-            <div v-for="bank in [bank1, bank2, cash]" :key="bank?.id" class="group relative overflow-hidden bg-white/70 backdrop-blur-xl rounded-[2.5rem] p-8 border border-white shadow-xl shadow-slate-200/50 transition-all hover:-translate-y-1 hover:shadow-2xl">
+            <div v-for="bank in banks" :key="bank.id" class="group relative overflow-hidden bg-white/70 backdrop-blur-xl rounded-[2.5rem] p-8 border border-white shadow-xl shadow-slate-200/50 transition-all hover:-translate-y-1 hover:shadow-2xl">
                 <div class="relative z-10 flex flex-col h-full">
                     <div class="flex items-center justify-between mb-8">
-                        <div class="w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner" :class="bank?.name === 'Cash' ? 'bg-emerald-50 text-emerald-600' : 'bg-indigo-50 text-indigo-600'">
-                            <span class="material-symbols-outlined text-3xl">{{ bank?.name === 'Cash' ? 'payments' : 'account_balance' }}</span>
+                        <div class="w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner" :class="bank.name.toLowerCase().includes('cash') ? 'bg-emerald-50 text-emerald-600' : 'bg-indigo-50 text-indigo-600'">
+                            <span class="material-symbols-outlined text-3xl">{{ bank.name.toLowerCase().includes('cash') ? 'payments' : 'account_balance' }}</span>
                         </div>
                         <div class="flex gap-2">
-                            <button @click="openAdjustmentModal(bank)" class="w-8 h-8 rounded-lg bg-white border border-slate-100 flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:border-indigo-100 transition-all" title="Adjust Balance">
-                                <span class="material-symbols-outlined text-[18px]">currency_exchange</span>
+                            <button @click="openAdjustmentModal(bank)" class="w-8 h-8 rounded-lg bg-white border border-slate-100 flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:border-indigo-100 transition-all shadow-sm" title="Add/Subtract Balance">
+                                <span class="material-symbols-outlined text-[18px]">add_circle</span>
                             </button>
-                            <span class="px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest" :class="bank?.name === 'Cash' ? 'bg-emerald-50 text-emerald-600' : 'bg-indigo-50 text-indigo-600'">
-                                {{ bank?.name || 'Account' }}
+                            <span class="px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest" :class="bank.name.toLowerCase().includes('cash') ? 'bg-emerald-50 text-emerald-600' : 'bg-indigo-50 text-indigo-600'">
+                                {{ bank.name }}
                             </span>
                         </div>
                     </div>
                     <div>
                         <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Available Balance</p>
-                        <h2 class="text-3xl lg:text-4xl font-black text-slate-900 tracking-tighter">{{ formatPrice(bank?.balance) }}</h2>
+                        <h2 class="text-3xl font-black text-slate-900 tracking-tighter">{{ formatPrice(bank.balance) }}</h2>
                     </div>
-                    <div class="mt-6 flex gap-2">
-                        <button @click="openAdjustmentModal(bank)" class="text-[10px] font-black uppercase tracking-widest text-indigo-600 hover:underline">Manual Entry</button>
-                        <span class="text-slate-300">•</span>
-                        <button @click="isExpenseModalOpen = true; bankExpenseForm.bank_id = bank.id" class="text-[10px] font-black uppercase tracking-widest text-rose-500 hover:underline">Record Outflow</button>
+                    <div class="mt-6 pt-4 border-t border-slate-50 flex items-center justify-between">
+                         <button @click="openAdjustmentModal(bank)" class="text-[10px] font-black uppercase tracking-widest text-indigo-600 hover:text-indigo-700 transition-colors">Quick Adjust</button>
+                         <span class="text-[10px] font-bold text-slate-300 uppercase tracking-widest">ID: #{{ bank.id }}</span>
                     </div>
                 </div>
             </div>
@@ -262,10 +264,26 @@ function pageRange(current, total) {
                             </tbody>
                         </table>
                     </div>
+
+                    <!-- Pagination Controls -->
+                    <div v-if="txTotalPages > 1" class="flex items-center justify-between pt-6 border-t border-slate-100">
+                        <div class="text-xs font-bold text-slate-400 uppercase tracking-widest">Page {{ txPage }} of {{ txTotalPages }}</div>
+                        <div class="flex gap-2">
+                            <button @click="txPage--" :disabled="txPage === 1" class="p-2 rounded-lg bg-slate-50 text-slate-400 hover:text-indigo-600 disabled:opacity-50 transition-all">
+                                <span class="material-symbols-outlined">chevron_left</span>
+                            </button>
+                            <div class="flex gap-1">
+                                <button v-for="p in pageRange(txPage, txTotalPages)" :key="p" @click="txPage = p" :class="txPage === p ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'" class="w-8 h-8 rounded-lg text-xs font-black transition-all">{{ p }}</button>
+                            </div>
+                            <button @click="txPage++" :disabled="txPage === txTotalPages" class="p-2 rounded-lg bg-slate-50 text-slate-400 hover:text-indigo-600 disabled:opacity-50 transition-all">
+                                <span class="material-symbols-outlined">chevron_right</span>
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Cheques and Cash Log (Simplified for brevity, assuming standard table) -->
-                <div v-if="activeSection === 'cash_log'" class="space-y-8">
+                <div v-if="activeSection === 'cash_log'" class="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                      <div class="rounded-3xl border border-slate-100 overflow-hidden">
                         <table class="w-full text-left">
                             <thead class="bg-slate-50 border-b border-slate-100">
@@ -283,11 +301,114 @@ function pageRange(current, total) {
                                         {{ tx.type === 'deposit' ? '+' : '-' }} {{ formatPrice(tx.amount) }}
                                     </td>
                                 </tr>
+                                <tr v-if="props.cash_log.length === 0">
+                                    <td colspan="3" class="py-20 text-center italic text-slate-400 font-bold">No cash transactions logged yet.</td>
+                                </tr>
                             </tbody>
                         </table>
                      </div>
+
+                     <!-- Pagination -->
+                     <div v-if="cashTotalPages > 1" class="flex items-center justify-between pt-6 border-t border-slate-100">
+                        <div class="text-xs font-bold text-slate-400 uppercase tracking-widest">Page {{ cashPage }} of {{ cashTotalPages }}</div>
+                        <div class="flex gap-2">
+                            <button @click="cashPage--" :disabled="cashPage === 1" class="p-2 rounded-lg bg-slate-50 text-slate-400 hover:text-indigo-600 disabled:opacity-50 transition-all">
+                                <span class="material-symbols-outlined">chevron_left</span>
+                            </button>
+                            <div class="flex gap-1">
+                                <button v-for="p in pageRange(cashPage, cashTotalPages)" :key="p" @click="cashPage = p" :class="cashPage === p ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'" class="w-8 h-8 rounded-lg text-xs font-black transition-all">{{ p }}</button>
+                            </div>
+                            <button @click="cashPage++" :disabled="cashPage === cashTotalPages" class="p-2 rounded-lg bg-slate-50 text-slate-400 hover:text-indigo-600 disabled:opacity-50 transition-all">
+                                <span class="material-symbols-outlined">chevron_right</span>
+                            </button>
+                        </div>
+                    </div>
                 </div>
-                <!-- ... existing cheques tab logic ... -->
+                <!-- Cheques Tab -->
+                <div v-if="activeSection === 'cheques'" class="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    <div class="flex items-center justify-between">
+                        <div class="flex bg-slate-100 p-1 rounded-2xl gap-1">
+                            <button @click="chequeTab = 'incoming'" :class="chequeTab === 'incoming' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'" class="px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all">Incoming</button>
+                            <button @click="chequeTab = 'outgoing'" :class="chequeTab === 'outgoing' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'" class="px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all">Outgoing</button>
+                        </div>
+                    </div>
+
+                    <div class="rounded-3xl border border-slate-100 overflow-hidden">
+                        <table class="w-full text-left">
+                            <thead>
+                                <tr class="bg-slate-50 text-lg font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
+                                    <th class="py-6 px-8">Due Date</th>
+                                    <th class="py-6 px-8">Cheque Details</th>
+                                    <th class="py-6 px-8">Parties (From → To)</th>
+                                    <th class="py-6 px-8">Amount</th>
+                                    <th class="py-6 px-8 text-right">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-50">
+                                <tr v-for="cheque in paginatedCheques" :key="cheque.id" class="group hover:bg-slate-50/50 transition-colors">
+                                    <td class="py-6 px-8">
+                                        <div class="text-xl font-bold text-slate-900">{{ formatDate(cheque.due_date) }}</div>
+                                        <div v-if="new Date(cheque.due_date) < new Date() && cheque.status === 'pending'" class="text-[10px] font-black text-rose-500 uppercase tracking-widest">Overdue</div>
+                                    </td>
+                                    <td class="py-6 px-8">
+                                        <div class="text-xl font-black text-slate-900">#{{ cheque.cheque_number }}</div>
+                                        <div class="flex items-center gap-2 mt-1">
+                                            <span class="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest" :class="cheque.status === 'pending' ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600'">
+                                                {{ cheque.status === 'pending' ? 'Pending' : 'Cleared' }}
+                                            </span>
+                                            <span v-if="cheque.bank" class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Bank: {{ cheque.bank.name }}</span>
+                                        </div>
+                                    </td>
+                                    <td class="py-6 px-8">
+                                        <div class="flex items-center gap-3 text-xl font-bold">
+                                            <span class="text-slate-900">{{ cheque.sender_name || '—' }}</span>
+                                            <span class="material-symbols-outlined text-slate-300">arrow_forward</span>
+                                            <span class="text-slate-900">{{ cheque.receiver_name || '—' }}</span>
+                                        </div>
+                                    </td>
+                                    <td class="py-6 px-8 text-2xl font-black text-slate-900">{{ formatPrice(cheque.amount) }}</td>
+                                    <td class="py-6 px-8 text-right">
+                                        <div v-if="cheque.status === 'pending'" class="flex justify-end gap-2">
+                                            <button 
+                                                v-if="cheque.type === 'incoming'"
+                                                @click="selectedCheque = cheque; receiveForm.bank_id = ''; isReceiveModalOpen = true"
+                                                class="px-4 py-2 bg-emerald-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-md shadow-emerald-100"
+                                            >Receive</button>
+                                            <button 
+                                                v-if="cheque.type === 'outgoing'"
+                                                @click="submitClear(cheque.id)"
+                                                class="px-4 py-2 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-md shadow-indigo-100"
+                                            >Mark Cleared</button>
+                                        </div>
+                                        <div v-else class="text-emerald-500 flex items-center justify-end gap-1">
+                                            <span class="material-symbols-outlined text-xl">check_circle</span>
+                                            <span class="text-[10px] font-black uppercase tracking-widest">Processed</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr v-if="activeCheques.length === 0">
+                                    <td colspan="5" class="py-20 text-center italic text-slate-400 font-bold">No active cheques in this category.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Pagination -->
+                    <div v-if="chequeTotalPages > 1" class="flex items-center justify-between pt-6 border-t border-slate-100">
+                        <div class="text-xs font-bold text-slate-400 uppercase tracking-widest">Page {{ chequePage }} of {{ chequeTotalPages }}</div>
+                        <div class="flex gap-2">
+                            <button @click="chequePage--" :disabled="chequePage === 1" class="p-2 rounded-lg bg-slate-50 text-slate-400 hover:text-indigo-600 disabled:opacity-50 transition-all">
+                                <span class="material-symbols-outlined">chevron_left</span>
+                            </button>
+                            <div class="flex gap-1">
+                                <button v-for="p in pageRange(chequePage, chequeTotalPages)" :key="p" @click="chequePage = p" :class="chequePage === p ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'" class="w-8 h-8 rounded-lg text-xs font-black transition-all">{{ p }}</button>
+                            </div>
+                            <button @click="chequePage++" :disabled="chequePage === chequeTotalPages" class="p-2 rounded-lg bg-slate-50 text-slate-400 hover:text-indigo-600 disabled:opacity-50 transition-all">
+                                <span class="material-symbols-outlined">chevron_right</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -351,15 +472,64 @@ function pageRange(current, total) {
              </form>
         </SideModal>
 
-        <SideModal :show="isChequeModalOpen" title="Register Cheque" @close="isChequeModalOpen = false">
+        <SideModal :show="isChequeModalOpen" title="Register New Cheque" @close="isChequeModalOpen = false">
             <form @submit.prevent="submitCheque" class="space-y-6 p-2">
-                <FormField label="Cheque Number" required><TextInput v-model="chequeForm.cheque_number" /></FormField>
-                <FormField label="Party Name" required><TextInput v-model="chequeForm.party_name" /></FormField>
-                <div class="grid grid-cols-2 gap-4">
-                    <FormField label="Amount" required><TextInput v-model="chequeForm.amount" type="number" /></FormField>
-                    <FormField label="Due Date" required><TextInput v-model="chequeForm.due_date" type="date" /></FormField>
+                <div class="flex bg-slate-100 p-1 rounded-2xl gap-1 mb-4">
+                    <button type="button" @click="chequeForm.type = 'incoming'" :class="chequeForm.type === 'incoming' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'" class="flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all">Incoming (استلام)</button>
+                    <button type="button" @click="chequeForm.type = 'outgoing'" :class="chequeForm.type === 'outgoing' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'" class="flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all">Outgoing (تسليم)</button>
                 </div>
-                <div class="pt-6 flex justify-end gap-3 border-t"><SecondaryButton @click="isChequeModalOpen = false" type="button">Cancel</SecondaryButton><PrimaryButton :loading="chequeForm.processing">Save Cheque</PrimaryButton></div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <FormField label="Cheque Number" required :error="chequeForm.errors.cheque_number">
+                        <TextInput v-model="chequeForm.cheque_number" placeholder="e.g. 982341" />
+                    </FormField>
+                    <FormField label="Amount (AED)" required :error="chequeForm.errors.amount">
+                        <TextInput v-model="chequeForm.amount" type="number" step="0.01" />
+                    </FormField>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <FormField label="Sender Name" required :error="chequeForm.errors.sender_name">
+                        <TextInput v-model="chequeForm.sender_name" :placeholder="chequeForm.type === 'outgoing' ? 'Precision (Internal)' : 'Customer Name'" />
+                    </FormField>
+                    <FormField label="Receiver Name" required :error="chequeForm.errors.receiver_name">
+                        <TextInput v-model="chequeForm.receiver_name" :placeholder="chequeForm.type === 'incoming' ? 'Precision (Internal)' : 'Payee Name'" />
+                    </FormField>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <FormField label="Due Date" required :error="chequeForm.errors.due_date">
+                        <TextInput v-model="chequeForm.due_date" type="date" />
+                    </FormField>
+                    <FormField v-if="chequeForm.type === 'outgoing'" label="Issue From Bank" required :error="chequeForm.errors.bank_id">
+                        <SelectInput v-model="chequeForm.bank_id" :options="banks.filter(b => b.name !== 'Cash').map(b => ({label: b.name, value: b.id}))" />
+                    </FormField>
+                </div>
+
+                <div class="pt-6 flex justify-end gap-3 border-t">
+                    <SecondaryButton @click="isChequeModalOpen = false" type="button">Cancel</SecondaryButton>
+                    <PrimaryButton :loading="chequeForm.processing" class="!bg-indigo-600">Save Cheque</PrimaryButton>
+                </div>
+            </form>
+        </SideModal>
+
+        <!-- Receive Incoming Cheque Modal -->
+        <SideModal :show="isReceiveModalOpen" title="Receive Cheque into Bank" @close="isReceiveModalOpen = false">
+            <form @submit.prevent="submitReceive" class="space-y-6 p-2">
+                <div v-if="selectedCheque" class="bg-emerald-50 p-6 rounded-[2rem] border border-emerald-100 mb-6">
+                    <p class="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">Incoming Cheque Details</p>
+                    <h4 class="text-2xl font-black text-slate-900">#{{ selectedCheque.cheque_number }}</h4>
+                    <p class="text-lg font-bold text-slate-600 mt-1">{{ formatPrice(selectedCheque.amount) }}</p>
+                </div>
+
+                <FormField label="Select Deposit Bank" required :error="receiveForm.errors.bank_id">
+                    <SelectInput v-model="receiveForm.bank_id" :options="banks.map(b => ({label: b.name + ' (Bal: ' + formatPrice(b.balance) + ')', value: b.id}))" />
+                </FormField>
+
+                <div class="pt-6 flex justify-end gap-3 border-t">
+                    <SecondaryButton @click="isReceiveModalOpen = false" type="button">Cancel</SecondaryButton>
+                    <PrimaryButton :loading="receiveForm.processing" class="!bg-emerald-600">Receive into Bank</PrimaryButton>
+                </div>
             </form>
         </SideModal>
     </div>

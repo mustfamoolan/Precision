@@ -18,25 +18,18 @@ class BankController extends Controller
     public function index()
     {
         $banks = Bank::all();
-        $bank1 = $banks->firstWhere('name', 'Bank 1');
-        $bank2 = $banks->firstWhere('name', 'Bank 2');
-        $cash = $banks->firstWhere('name', 'Cash');
-
-        $transactions = BankTransaction::with('bank')->latest('date')->latest('id')->take(100)->get();
+        
+        $transactions = BankTransaction::with('bank')->latest('date')->latest('id')->take(500)->get();
         $cash_log = BankTransaction::whereHas('bank', function($query) {
-            $query->where('name', 'Cash');
-        })->latest('date')->latest('id')->take(100)->get();
+            $query->where('name', 'like', '%Cash%');
+        })->latest('date')->latest('id')->take(500)->get();
 
         return Inertia::render('Banks', [
             'banks' => $banks,
-            'bank1' => $bank1,
-            'bank2' => $bank2,
-            'cash' => $cash,
             'transactions' => $transactions,
             'cash_log' => $cash_log,
-            'incoming_cheques' => Cheque::where('type', 'incoming')->latest('due_date')->get(),
-            'outgoing_cheques' => Cheque::where('type', 'outgoing')->latest('due_date')->get(),
-            'received_cheques' => Cheque::where('status', 'received')->latest('updated_at')->take(10)->get(),
+            'incoming_cheques' => Cheque::with('bank')->where('type', 'incoming')->latest('due_date')->get(),
+            'outgoing_cheques' => Cheque::with('bank')->where('type', 'outgoing')->latest('due_date')->get(),
             'employees' => \App\Models\Employee::all(['id', 'name']),
         ]);
     }

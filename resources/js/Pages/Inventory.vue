@@ -29,7 +29,11 @@ const showAddModal = ref(false);
 const showBrandModal = ref(false);
 const showTransferModal = ref(false);
 const showDeductModal = ref(false);
+const showAdjustModal = ref(false);
+const showItemHistoryModal = ref(false);
 const selectedItem = ref(null);
+const itemHistory = ref([]);
+const loadingHistory = ref(false);
 
 const form = useForm({
     name: '',
@@ -58,6 +62,13 @@ const deductForm = useForm({
     customer_id: '',
     quantity: 1,
     location: 'shop',
+    notes: '',
+});
+
+const adjustForm = useForm({
+    quantity: 1,
+    location: 'shop',
+    type: 'in', // 'in' for increase, 'out' for decrease
     notes: '',
 });
 
@@ -92,6 +103,26 @@ const openDeductModal = (item) => {
     selectedItem.value = item;
     deductForm.reset();
     showDeductModal.value = true;
+};
+
+const openAdjustModal = (item) => {
+    selectedItem.value = item;
+    adjustForm.reset();
+    showAdjustModal.value = true;
+};
+
+const openItemHistoryModal = (item) => {
+    selectedItem.value = item;
+    itemHistory.value = [];
+    loadingHistory.value = true;
+    showItemHistoryModal.value = true;
+    
+    fetch(`/inventory/${item.id}/history`)
+        .then(res => res.json())
+        .then(data => {
+            itemHistory.value = data.movements;
+            loadingHistory.value = false;
+        });
 };
 
 const submitBrand = () => {
@@ -137,6 +168,27 @@ const submitDeduction = () => {
             deductForm.reset();
         }
     });
+};
+
+const submitAdjustment = () => {
+    adjustForm.post(`/inventory/${selectedItem.value.id}/adjust`, {
+        onSuccess: () => {
+            showAdjustModal.value = false;
+            adjustForm.reset();
+        },
+    });
+};
+
+const confirmDelete = (id) => {
+    if (confirm('Are you sure you want to delete this product?')) {
+        router.delete(`/inventory/${id}`);
+    }
+};
+
+const confirmDeleteBrand = (id) => {
+    if (confirm('Are you sure you want to delete this brand? This will delete all products in this brand.')) {
+        router.delete(`/brands/${id}`);
+    }
 };
 
 const formatCurrency = (value) => {
@@ -345,6 +397,12 @@ const getBrandName = (id) => {
                                 </td>
                                 <td class="px-6 py-4 text-center">
                                     <div class="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button @click="openItemHistoryModal(item)" class="p-2 text-indigo-500 hover:bg-indigo-50 rounded-lg transition-colors" title="View Product History">
+                                            <span class="material-symbols-outlined text-[20px]">history</span>
+                                        </button>
+                                        <button @click="openAdjustModal(item)" class="p-2 text-emerald-500 hover:bg-emerald-50 rounded-lg transition-colors" title="Increase/Decrease Stock">
+                                            <span class="material-symbols-outlined text-[20px]">add_box</span>
+                                        </button>
                                         <button @click="openDeductModal(item)" class="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors" title="Customer Deduction">
                                             <span class="material-symbols-outlined text-[20px]">person_remove</span>
                                         </button>
@@ -354,7 +412,7 @@ const getBrandName = (id) => {
                                         <button @click="openEditModal(item)" class="p-2 text-outline hover:text-primary transition-colors">
                                             <span class="material-symbols-outlined text-[20px]">edit</span>
                                         </button>
-                                        <button @click="router.delete(`/inventory/${item.id}`)" class="p-2 text-outline hover:text-error transition-colors">
+                                        <button @click="confirmDelete(item.id)" class="p-2 text-outline hover:text-error transition-colors">
                                             <span class="material-symbols-outlined text-[20px]">delete</span>
                                         </button>
                                     </div>
@@ -518,6 +576,68 @@ const getBrandName = (id) => {
                     </div>
                 </form>
             </div>
+        </SideModal>
+
+        <!-- Adjustment Modal -->
+        <SideModal :show="showAdjustModal" title="Stock Adjustment" @close="showAdjustModal = false">
+            <div v-if="selectedItem" class="p-2 space-y-6">
+                <div class="bg-emerald-50 p-4 rounded-xl border border-emerald-100 text-emerald-900">
+                    <p class="text-[10px] font-bold uppercase mb-1">Adjusting Stock</p>
+                    <p class="text-sm font-bold">{{ selectedItem.name }}</p>
+                </div>
+                <form @submit.prevent="submitAdjustment" class="space-y-4">
+                    <div class="grid grid-cols-2 gap-4">
+                        <FormField label="Adjustment Type" required>
+                            <SelectInput v-model="adjustForm.type" :options="[{label: 'Increase (+)', value: 'in'}, {label: 'Decrease (-)', value: 'out'}]" />
+                        </FormField>
+                        <FormField label="Location" required>
+                            <SelectInput v-model="adjustForm.location" :options="locations" />
+                        </FormField>
+                    </div>
+                    <FormField label="Quantity" required :error="adjustForm.errors.quantity">
+                        <TextInput v-model="adjustForm.quantity" type="number" min="1" />
+                    </FormField>
+                    <FormField label="Reason / Notes"><TextInput v-model="adjustForm.notes" placeholder="e.g. New stock, damage, correction..." /></FormField>
+                    <div class="pt-6 flex justify-end gap-3 border-t mt-6">
+                        <SecondaryButton @click="showAdjustModal = false" type="button">Cancel</SecondaryButton>
+                        <PrimaryButton :loading="adjustForm.processing" class="!bg-emerald-600 hover:!bg-emerald-700">Update Stock</PrimaryButton>
+                    </div>
+                </form>
+            </div>
+        </SideModal>
+
+        <!-- Product History Modal -->
+        <SideModal :show="showItemHistoryModal" :title="`History: ${selectedItem?.name}`" @close="showItemHistoryModal = false">
+            <div class="space-y-4 p-2">
+                <div v-if="loadingHistory" class="flex justify-center py-10">
+                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                </div>
+                <div v-else-if="itemHistory.length === 0" class="text-center py-10 text-outline italic">
+                    No history found for this product.
+                </div>
+                <div v-else class="space-y-4">
+                    <div v-for="move in itemHistory" :key="move.id" class="p-4 bg-surface-container-low/30 rounded-2xl border border-outline-variant/10">
+                        <div class="flex justify-between items-start mb-2">
+                            <Badge :variant="move.type === 'in' ? 'success' : (move.type === 'transfer' ? 'warning' : 'error')" class="px-3 py-1 font-black text-[10px]">
+                                {{ move.type.toUpperCase() }}
+                            </Badge>
+                            <span class="text-[10px] text-outline">{{ new Date(move.created_at).toLocaleString() }}</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <div class="text-xs text-on-surface">
+                                <span class="capitalize font-bold">{{ move.from_location || 'Source' }}</span>
+                                <span class="material-symbols-outlined text-[10px] mx-1">arrow_forward</span>
+                                <span class="capitalize font-bold">{{ move.to_location || 'Destination' }}</span>
+                            </div>
+                            <span class="text-xl font-black">{{ move.quantity }} units</span>
+                        </div>
+                        <p v-if="move.notes" class="mt-2 text-[11px] text-outline italic">{{ move.notes }}</p>
+                    </div>
+                </div>
+            </div>
+            <template #footer>
+                <SecondaryButton @click="showItemHistoryModal = false" class="w-full">Close History</SecondaryButton>
+            </template>
         </SideModal>
     </div>
 </template>
