@@ -9,10 +9,33 @@ use Illuminate\Support\Facades\Artisan;
 
 class ReminderController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
+        $query = Reminder::query();
+
+        if ($request->filled('search')) {
+            $query->where(function($q) use ($request) {
+                $q->where('item', 'like', '%' . $request->search . '%')
+                  ->orWhere('notes', 'like', '%' . $request->search . '%');
+            });
+        }
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
+        $reminders = $query->latest('date')->latest('id')->paginate(15)->withQueryString();
+
+        $kpi = [
+            'pending' => Reminder::where('status', 'pending')->count(),
+            'in_progress' => Reminder::where('status', 'in_progress')->count(),
+            'done' => Reminder::where('status', 'done')->count(),
+        ];
+
         return Inertia::render('Reminders', [
-            'reminders' => Reminder::latest('date')->get(),
+            'reminders' => $reminders,
+            'kpi' => $kpi,
+            'filters' => $request->all(['search', 'status']),
         ]);
     }
 

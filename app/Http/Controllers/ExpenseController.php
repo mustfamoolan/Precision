@@ -41,7 +41,7 @@ class ExpenseController extends Controller
             });
         }
 
-        $expenses = $query->latest('date')->get();
+        $expenses = $query->latest('date')->latest('id')->paginate(15)->withQueryString();
         
         // Summary Data for KPIs (based on Image 1)
         $totalExpenses = $query->sum('amount');

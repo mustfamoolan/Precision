@@ -7,12 +7,13 @@ import SecondaryButton from '@/Components/SecondaryButton.vue';
 import SideModal from '@/Components/SideModal.vue';
 import FormField from '@/Components/FormField.vue';
 import TextInput from '@/Components/TextInput.vue';
+import Pagination from '@/Components/Pagination.vue';
 
 defineOptions({ layout: MainLayout });
 
 const props = defineProps({
-    employees: Array,
-    customers: Array,
+    employees: Object,
+    customers: Object,
 });
 
 const activeTab = ref('customers'); // 'employees' or 'customers'
@@ -21,12 +22,14 @@ const editingContact = ref(null);
 
 const form = useForm({
     name: '',
+    address: '',
 });
 
 const openModal = (contact = null) => {
     if (contact) {
         editingContact.value = contact;
         form.name = contact.name;
+        form.address = contact.address || '';
     } else {
         editingContact.value = null;
         form.reset();
@@ -104,7 +107,7 @@ const destroy = (id) => {
                 </div>
                 <div>
                     <h3 class="text-sm font-headline font-bold text-on-surface uppercase tracking-widest">Internal Team</h3>
-                    <p class="text-[10px] font-bold text-outline uppercase tracking-widest">{{ employees.length }} Employees</p>
+                    <p class="text-[10px] font-bold text-outline uppercase tracking-widest">{{ employees.total }} Employees</p>
                 </div>
             </div>
             <div class="overflow-x-auto">
@@ -113,15 +116,17 @@ const destroy = (id) => {
                         <tr class="bg-surface-container-low/50 text-xl font-bold text-outline uppercase tracking-wider">
                             <th class="px-6 py-6 w-20">ID</th>
                             <th class="px-6 py-6">Full Name</th>
+                            <th class="px-6 py-6">Address</th>
                             <th class="px-6 py-6 text-right">Actions</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-outline-variant/10">
-                        <tr v-for="emp in employees" :key="'emp'+emp.id" class="hover:bg-surface-container-low/30 transition-colors group">
+                        <tr v-for="emp in employees.data" :key="'emp'+emp.id" class="hover:bg-surface-container-low/30 transition-colors group">
                             <td class="px-6 py-6 text-lg font-bold text-outline">#{{ emp.id }}</td>
                             <td class="px-6 py-6">
                                 <span class="text-2xl font-bold text-on-surface">{{ emp.name }}</span>
                             </td>
+                            <td class="px-6 py-6 text-sm text-outline">{{ emp.address || '-' }}</td>
                             <td class="px-6 py-4 text-right">
                                 <div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                     <button @click="openModal(emp)" class="p-1.5 text-outline hover:text-primary transition-colors"><span class="material-symbols-outlined text-[18px]">edit</span></button>
@@ -129,11 +134,15 @@ const destroy = (id) => {
                                 </div>
                             </td>
                         </tr>
-                        <tr v-if="employees.length === 0">
-                            <td colspan="3" class="py-12 text-center text-outline text-xs">No employees found.</td>
+                        <tr v-if="employees.data.length === 0">
+                            <td colspan="4" class="py-12 text-center text-outline text-xs">No employees found.</td>
                         </tr>
                     </tbody>
                 </table>
+            </div>
+            
+            <div class="p-4 border-t border-outline-variant/10">
+                <Pagination :links="employees.links" :meta="employees" />
             </div>
         </div>
 
@@ -145,7 +154,7 @@ const destroy = (id) => {
                 </div>
                 <div>
                     <h3 class="text-sm font-headline font-bold text-on-surface uppercase tracking-widest">Client Roster</h3>
-                    <p class="text-[10px] font-bold text-outline uppercase tracking-widest">{{ customers.length }} Customers</p>
+                    <p class="text-[10px] font-bold text-outline uppercase tracking-widest">{{ customers.total }} Customers</p>
                 </div>
             </div>
             <div class="overflow-x-auto">
@@ -154,15 +163,17 @@ const destroy = (id) => {
                         <tr class="bg-surface-container-low/50 text-xl font-bold text-outline uppercase tracking-wider">
                             <th class="px-6 py-6 w-20">ID</th>
                             <th class="px-6 py-6">Full Name</th>
+                            <th class="px-6 py-6">Address</th>
                             <th class="px-6 py-6 text-right">Actions</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-outline-variant/10">
-                        <tr v-for="cust in customers" :key="'cust'+cust.id" class="hover:bg-surface-container-low/30 transition-colors group">
+                        <tr v-for="cust in customers.data" :key="'cust'+cust.id" class="hover:bg-surface-container-low/30 transition-colors group">
                             <td class="px-6 py-6 text-lg font-bold text-outline">#{{ cust.id }}</td>
                             <td class="px-6 py-6">
                                 <span class="text-2xl font-bold text-on-surface">{{ cust.name }}</span>
                             </td>
+                            <td class="px-6 py-6 text-sm text-outline">{{ cust.address || '-' }}</td>
                             <td class="px-6 py-4 text-right">
                                 <div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                     <button @click="openModal(cust)" class="p-1.5 text-outline hover:text-primary transition-colors"><span class="material-symbols-outlined text-[18px]">edit</span></button>
@@ -170,19 +181,27 @@ const destroy = (id) => {
                                 </div>
                             </td>
                         </tr>
-                        <tr v-if="customers.length === 0">
-                            <td colspan="3" class="py-12 text-center text-outline text-xs">No customers found.</td>
+                        <tr v-if="customers.data.length === 0">
+                            <td colspan="4" class="py-12 text-center text-outline text-xs">No customers found.</td>
                         </tr>
                     </tbody>
                 </table>
+            </div>
+            
+            <div class="p-4 border-t border-outline-variant/10">
+                <Pagination :links="customers.links" :meta="customers" />
             </div>
         </div>
 
         <!-- Add/Edit Modal -->
         <SideModal :show="showModal" :title="(editingContact ? 'Edit ' : 'Add ') + (activeTab === 'employees' ? 'Employee' : 'Customer')" @close="showModal = false">
             <form @submit.prevent="submit" class="space-y-6 p-2">
-                <FormField label="Full Name" :error="form.errors.name" required>
-                    <TextInput v-model="form.name" placeholder="John Doe" />
+                <FormField :label="activeTab === 'employees' ? 'Employee Name' : 'Customer Name'" :error="form.errors.name" required>
+                    <TextInput v-model="form.name" placeholder="Enter name..." />
+                </FormField>
+
+                <FormField label="Address (Optional)" :error="form.errors.address">
+                    <TextInput v-model="form.address" placeholder="Enter address..." />
                 </FormField>
 
                 <div class="pt-6 flex justify-end gap-3 border-t border-outline-variant/10 mt-6">

@@ -8,35 +8,27 @@ import TextInput from '@/Components/TextInput.vue';
 import SelectInput from '@/Components/SelectInput.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
+import Pagination from '@/Components/Pagination.vue';
 
 defineOptions({ layout: MainLayout });
 
 const props = defineProps({
-    reminders: Array,
+    reminders: Object,
+    kpi: Object,
+    filters: Object,
 });
 
-const search = ref('');
-const statusFilter = ref('');
+const search = ref(props.filters?.search || '');
+const statusFilter = ref(props.filters?.status || '');
 const isModalOpen = ref(false);
 const editingReminder = ref(null);
 
-const form = useForm({
-    date: '',
-    item: '',
-    quantity: '',
-    unit: '',
-    notes: '',
-    status: 'pending',
-});
-
-const filteredReminders = computed(() => {
-    return props.reminders.filter(r => {
-        const matchesSearch = (r.item || '').toLowerCase().includes(search.value.toLowerCase()) || 
-                              (r.notes || '').toLowerCase().includes(search.value.toLowerCase());
-        const matchesStatus = statusFilter.value === '' || r.status === statusFilter.value;
-        return matchesSearch && matchesStatus;
-    });
-});
+const handleFilter = () => {
+    router.get('/reminders', {
+        search: search.value,
+        status: statusFilter.value,
+    }, { preserveState: true, preserveScroll: true });
+};
 
 const openModal = (reminder = null) => {
     if (reminder) {
@@ -104,9 +96,9 @@ const formatDate = (dateString) => {
 };
 
 // Compute KPI
-const pendingCount = computed(() => props.reminders.filter(r => r.status === 'pending').length);
-const inProgressCount = computed(() => props.reminders.filter(r => r.status === 'in_progress').length);
-const completedCount = computed(() => props.reminders.filter(r => r.status === 'done').length);
+const pendingCount = computed(() => props.kpi.pending);
+const inProgressCount = computed(() => props.kpi.in_progress);
+const completedCount = computed(() => props.kpi.done);
 </script>
 
 <template>
@@ -172,10 +164,10 @@ const completedCount = computed(() => props.reminders.filter(r => r.status === '
                 <div class="flex gap-3 w-full sm:w-auto">
                     <div class="relative flex-1 sm:min-w-[250px]">
                         <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[18px]">search</span>
-                        <input v-model="search" type="text" placeholder="Search tasks..."
+                        <input v-model="search" @keyup.enter="handleFilter" type="text" placeholder="Search tasks..."
                             class="w-full pl-10 pr-4 py-2 bg-surface-container-low border border-outline-variant/20 rounded-lg text-xs font-medium text-on-surface outline-none focus:ring-1 focus:ring-primary transition-all" />
                     </div>
-                    <select v-model="statusFilter" class="bg-surface-container-low border border-outline-variant/20 rounded-lg px-4 py-2 text-xs font-bold text-on-surface outline-none cursor-pointer">
+                    <select v-model="statusFilter" @change="handleFilter" class="bg-surface-container-low border border-outline-variant/20 rounded-lg px-4 py-2 text-xs font-bold text-on-surface outline-none cursor-pointer">
                         <option value="">All Statuses</option>
                         <option value="pending">Pending</option>
                         <option value="in_progress">In Progress</option>
@@ -197,7 +189,7 @@ const completedCount = computed(() => props.reminders.filter(r => r.status === '
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-outline-variant/10">
-                        <tr v-for="r in filteredReminders" :key="r.id" class="group hover:bg-surface-container-low/50 transition-colors">
+                        <tr v-for="r in reminders.data" :key="r.id" class="group hover:bg-surface-container-low/50 transition-colors">
                             <td class="py-6 px-6">
                                 <div class="text-xl font-bold text-on-surface whitespace-nowrap">{{ formatDate(r.date) }}</div>
                             </td>
@@ -231,7 +223,7 @@ const completedCount = computed(() => props.reminders.filter(r => r.status === '
                                 </div>
                             </td>
                         </tr>
-                        <tr v-if="filteredReminders.length === 0">
+                        <tr v-if="reminders.data.length === 0">
                             <td colspan="6" class="py-20 text-center">
                                 <div class="flex flex-col items-center">
                                     <span class="material-symbols-outlined text-5xl text-outline-variant mb-4">search_off</span>
@@ -242,6 +234,10 @@ const completedCount = computed(() => props.reminders.filter(r => r.status === '
                         </tr>
                     </tbody>
                 </table>
+            </div>
+
+            <div class="p-5 border-t border-outline-variant/20">
+                <Pagination :links="reminders.links" :meta="reminders" />
             </div>
         </div>
 

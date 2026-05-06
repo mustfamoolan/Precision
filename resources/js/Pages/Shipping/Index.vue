@@ -9,10 +9,11 @@ import SelectInput from '@/Components/SelectInput.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
 import Badge from '@/Components/Badge.vue';
+import Pagination from '@/Components/Pagination.vue';
 
 defineOptions({ layout: MainLayout });
 
-const props = defineProps({ shipments: Array, summary: Object, filters: Object });
+const props = defineProps({ shipments: Object, summary: Object, filters: Object });
 
 const search   = ref(props.filters?.search || '');
 const statusF  = ref(props.filters?.status || '');
@@ -125,7 +126,7 @@ const doSearch = () => router.get('/shipping', { search: search.value, status: s
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-outline-variant/10">
-                        <tr v-for="s in shipments" :key="s.id" class="group hover:bg-surface-container-low/50 transition-colors">
+                        <tr v-for="s in shipments.data" :key="s.id" class="group hover:bg-surface-container-low/50 transition-colors">
                             <td class="py-6 px-6">
                                 <Link :href="`/shipping/${s.id}`" class="block group/link">
                                     <p class="text-xl font-bold text-on-surface group-hover/link:text-primary transition-colors">{{ s.container_number }}</p>
@@ -158,11 +159,15 @@ const doSearch = () => router.get('/shipping', { search: search.value, status: s
                                 </div>
                             </td>
                         </tr>
-                        <tr v-if="shipments.length === 0">
+                        <tr v-if="shipments.data.length === 0">
                             <td colspan="6" class="py-20 text-center text-outline text-xs italic">No shipments found.</td>
                         </tr>
                     </tbody>
                 </table>
+            </div>
+
+            <div class="p-4 border-t border-outline-variant/10">
+                <Pagination :links="shipments.links" :meta="shipments" />
             </div>
         </div>
 

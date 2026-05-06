@@ -15,15 +15,30 @@ class InventoryController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $inventory = Inventory::with('brand')->latest()->get();
+        $query = Inventory::with('brand')->latest();
+        
+        if ($request->search) {
+            $query->where(function($q) use ($request) {
+                $q->where('name', 'like', '%' . $request->search . '%')
+                  ->orWhere('category', 'like', '%' . $request->search . '%');
+            });
+        }
+        
+        if ($request->brand_id) {
+            $query->where('brand_id', $request->brand_id);
+        }
+
+        $inventory = $query->paginate(15)->withQueryString();
         $brands = Brand::withCount('products')->get();
         
+        // Use a separate query for summary to avoid pagination issues
+        $summaryData = Inventory::all();
         $summary = [
-            'total_items' => $inventory->count(),
-            'total_valuation' => $inventory->sum('valuation'),
-            'low_stock_items' => $inventory->filter(fn($item) => $item->total_quantity <= $item->low_stock_threshold)->count(),
+            'total_items' => $summaryData->count(),
+            'total_valuation' => $summaryData->sum('valuation'),
+            'low_stock_items' => $summaryData->filter(fn($item) => $item->total_quantity <= $item->low_stock_threshold)->count(),
         ];
 
         return Inertia::render('Inventory', [
@@ -31,7 +46,8 @@ class InventoryController extends Controller
             'brands' => $brands,
             'customers' => Customer::all(['id', 'name']),
             'summary' => $summary,
-            'movements' => StockMovement::with('inventory')->latest()->limit(20)->get()
+            'movements' => StockMovement::with('inventory')->latest()->paginate(15, ['*'], 'movements_page')->withQueryString(),
+            'filters' => $request->only(['search', 'brand_id']),
         ]);
     }
 

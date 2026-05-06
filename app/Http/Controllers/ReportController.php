@@ -68,22 +68,30 @@ class ReportController extends Controller
             ->limit(5)
             ->get();
 
-        // Full Ledger Data
-        $salesFeed = Sale::whereBetween('date', [$startDate, $endDate])
-            ->select('date', 'customer_name as name', 'amount', 'paid_amount', 'due_amount', DB::raw("'sale' as type"))
-            ->get();
-            
-        $expensesFeed = Expense::with('employee')->whereBetween('date', [$startDate, $endDate])
-            ->select('date', 'description as name', 'amount', 'employee_id', DB::raw("'expense' as type"))
-            ->get()
-            ->map(function($e) {
-                $e->name = $e->name . " (" . ($e->employee->name ?? 'System') . ")";
-                $e->paid_amount = $e->amount;
-                $e->due_amount = 0;
-                return $e;
-            });
+        // Full Ledger Data (Unified query for pagination)
+        $salesQuery = DB::table('sales')
+            ->whereBetween('date', [$startDate, $endDate])
+            ->select('date', 'customer_name as name', 'invoice_number as reference', 'amount', 'paid_amount', 'due_amount', DB::raw("'sale' as type"), 'id');
 
-        $ledger = $salesFeed->concat($expensesFeed)->sortByDesc('date')->values();
+        $expensesQuery = DB::table('expenses')
+            ->leftJoin('employees', 'expenses.employee_id', '=', 'employees.id')
+            ->whereBetween('expenses.date', [$startDate, $endDate])
+            ->select(
+                'expenses.date', 
+                DB::raw("CONCAT(expenses.description, ' (', IFNULL(employees.name, 'System'), ')') as name"), 
+                'expenses.expense_number as reference',
+                'expenses.amount', 
+                'expenses.amount as paid_amount', 
+                DB::raw('0 as due_amount'), 
+                DB::raw("'expense' as type"),
+                'expenses.id'
+            );
+
+        $ledger = $salesQuery->unionAll($expensesQuery)
+            ->orderByDesc('date')
+            ->orderByDesc('id')
+            ->paginate(15)
+            ->withQueryString();
 
         return Inertia::render('Reports', [
             'summary' => [

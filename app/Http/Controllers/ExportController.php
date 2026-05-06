@@ -21,7 +21,7 @@ class ExportController extends Controller
             $handle = fopen('php://output', 'w');
             fputcsv($handle, ['Date', 'Invoice #', 'Customer', 'Type', 'Amount', 'Paid', 'Due', 'Status']);
 
-            Sale::chunk(100, function ($sales) use ($handle) {
+            Sale::latest('date')->latest('id')->chunk(100, function ($sales) use ($handle) {
                 foreach ($sales as $sale) {
                     fputcsv($handle, [
                         $sale->date,
@@ -49,12 +49,13 @@ class ExportController extends Controller
 
         return new StreamedResponse(function () {
             $handle = fopen('php://output', 'w');
-            fputcsv($handle, ['Date', 'Description', 'Employee', 'Amount', 'Payment Method']);
+            fputcsv($handle, ['Date', 'Ref #', 'Description', 'Employee', 'Amount', 'Payment Method']);
 
-            Expense::with('employee')->chunk(100, function ($expenses) use ($handle) {
+            Expense::with('employee')->latest('date')->latest('id')->chunk(100, function ($expenses) use ($handle) {
                 foreach ($expenses as $expense) {
                     fputcsv($handle, [
                         $expense->date,
+                        $expense->expense_number,
                         $expense->description,
                         $expense->employee->name ?? 'N/A',
                         $expense->amount,
@@ -78,7 +79,7 @@ class ExportController extends Controller
             $handle = fopen('php://output', 'w');
             fputcsv($handle, ['SKU', 'Name', 'Category', 'Shop Qty', 'Warehouse Qty', 'Remote Qty', 'Total Qty', 'Cost Price', 'Selling Price', 'Valuation']);
 
-            Inventory::chunk(100, function ($items) use ($handle) {
+            Inventory::latest()->chunk(100, function ($items) use ($handle) {
                 foreach ($items as $item) {
                     fputcsv($handle, [
                         $item->sku,

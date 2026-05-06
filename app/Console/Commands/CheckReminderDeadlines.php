@@ -30,37 +30,8 @@ class CheckReminderDeadlines extends Command
      */
     public function handle()
     {
-        $reminders = Reminder::where('status', '!=', 'done')->get();
-        $today = Carbon::today();
-        $users = User::all();
-
-        if ($users->isEmpty()) {
-            $this->error('No users found to notify.');
-            return;
-        }
-
-        foreach ($reminders as $reminder) {
-            $dueDate = Carbon::parse($reminder->date)->startOfDay();
-            $daysUntil = $today->diffInDays($dueDate, false);
-
-            $milestoneLabel = null;
-            
-            if ($daysUntil < 0) {
-                $milestoneLabel = "OVERDUE by " . abs($daysUntil) . " days";
-            } elseif ($daysUntil == 0) {
-                $milestoneLabel = "DUE TODAY";
-            } elseif ($daysUntil <= 5) {
-                $milestoneLabel = "due in $daysUntil days";
-            }
-
-            if ($milestoneLabel) {
-                foreach ($users as $user) {
-                    $this->notifyIfNeeded($user, $reminder, $daysUntil, $milestoneLabel);
-                }
-            }
-        }
-
-        $this->info('Reminder check complete.');
+        // Logic disabled per user request to only show cheque notifications
+        $this->info('Reminder check skipped (disabled by request).');
     }
 
     protected function notifyIfNeeded($user, $reminder, $milestone, $label)

@@ -48,7 +48,7 @@ class SaleController extends Controller
             $query->where('status', $request->status);
         }
 
-        $sales = $query->with(['payments.bank', 'bank'])->latest('date')->get();
+        $sales = $query->with(['payments.bank', 'bank'])->latest('date')->latest('id')->paginate(15)->withQueryString();
 
         // Summary Data for the current view
         $totalAmount = $query->sum('amount');
@@ -71,7 +71,7 @@ class SaleController extends Controller
                 'status' => $request->get('status', 'all'),
             ]),
             'banks' => Bank::all(['id', 'name']),
-            'customers' => \App\Models\Customer::all(['id', 'name']),
+            'customers' => \App\Models\Customer::orderBy('name')->get(['id', 'name', 'address']),
             'inventory' => \App\Models\Inventory::all(['id', 'name', 'sku']),
         ]);
     }
@@ -90,6 +90,8 @@ class SaleController extends Controller
             'shipping_status' => 'nullable|string',
             'bank_id' => 'nullable|exists:banks,id',
             'items' => 'nullable|array',
+            'customer_address' => 'nullable|string|max:500',
+
         ]);
 
         $validated['paid_amount'] = $validated['paid_amount'] ?? 0;
@@ -121,6 +123,17 @@ class SaleController extends Controller
             }
             return \App\Models\Sale::create($validated);
         });
+
+        // Record Initial Payment to Bank System
+        if ($sale->paid_amount > 0 && $sale->bank_id) {
+            \App\Models\SalePayment::create([
+                'sale_id' => $sale->id,
+                'bank_id' => $sale->bank_id,
+                'amount' => $sale->paid_amount,
+                'date' => $sale->date,
+                'note' => 'Initial payment upon creation'
+            ]);
+        }
 
         // Log stock movements for items (for history tracking)
         if (!empty($validated['items'])) {
@@ -157,6 +170,8 @@ class SaleController extends Controller
             'shipping_status' => 'nullable|string',
             'bank_id' => 'nullable|exists:banks,id',
             'items' => 'nullable|array',
+            'customer_address' => 'nullable|string|max:500',
+
         ]);
 
         $validated['paid_amount'] = $validated['paid_amount'] ?? 0;

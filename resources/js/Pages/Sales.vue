@@ -9,12 +9,13 @@ import SelectInput from '@/Components/SelectInput.vue';
 import Badge from '@/Components/Badge.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
+import Pagination from '@/Components/Pagination.vue';
 import { jsPDF } from 'jspdf';
 
 defineOptions({ layout: MainLayout });
 
 const props = defineProps({
-    sales: Array,
+    sales: Object,
     summary: Object,
     filters: Object,
     banks: Array,
@@ -196,7 +197,7 @@ const exportPDF = () => {
     addRow(cols, widths, true); 
     addLine();
     
-    props.sales.forEach(sale => {
+    props.sales.data.forEach(sale => {
         const cust = (sale.customer_name || '').substring(0, 40);
         
         addRow([
@@ -332,7 +333,7 @@ const statuses = [{label: 'All Status', value: 'all'}, {label: 'Paid', value: 'p
                 <div class="flex items-center gap-4 w-full xl:w-auto">
                     <div>
                         <h3 class="text-xl font-black text-slate-900 uppercase tracking-tight">Sales Records</h3>
-                        <p class="text-sm text-slate-400 font-medium mt-0.5">{{ sales.length }} records found</p>
+                        <p class="text-sm text-slate-400 font-medium mt-0.5">{{ sales.total }} records found</p>
                     </div>
 
                     <div class="h-8 w-px bg-slate-200 mx-2 hidden sm:block"></div>
@@ -377,7 +378,7 @@ const statuses = [{label: 'All Status', value: 'all'}, {label: 'Paid', value: 'p
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-50">
-                        <tr v-for="sale in sales" :key="sale.id" class="group hover:bg-slate-50/50 transition-colors">
+                        <tr v-for="sale in sales.data" :key="sale.id" class="group hover:bg-slate-50/50 transition-colors">
                             <td class="py-6 px-8 text-xl font-bold text-slate-900 whitespace-nowrap">{{ sale.invoice_number }}</td>
                             <td class="py-6 px-8 text-xl font-bold text-slate-500 whitespace-nowrap">{{ sale.date }}</td>
                             <td class="py-6 px-8 text-xl font-medium text-slate-600 min-w-[200px]">{{ sale.customer_name }}</td>
@@ -413,7 +414,7 @@ const statuses = [{label: 'All Status', value: 'all'}, {label: 'Paid', value: 'p
                                 </div>
                             </td>
                         </tr>
-                        <tr v-if="sales.length === 0">
+                        <tr v-if="sales.data.length === 0">
                             <td colspan="8" class="py-20 text-center text-slate-400 italic text-sm">
                                 <span class="material-symbols-outlined text-4xl block mb-2 opacity-50">search_off</span>
                                 No sales found for the selected filters.
@@ -421,6 +422,10 @@ const statuses = [{label: 'All Status', value: 'all'}, {label: 'Paid', value: 'p
                         </tr>
                     </tbody>
                 </table>
+            </div>
+
+            <div class="p-6 border-t border-slate-100">
+                <Pagination :links="sales.links" :meta="sales" />
             </div>
         </div>
 

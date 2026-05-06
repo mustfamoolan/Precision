@@ -10,15 +10,18 @@ import TextArea from '@/Components/TextArea.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
 
+import Pagination from '@/Components/Pagination.vue';
+
 defineOptions({ layout: MainLayout });
 
 const props = defineProps({
     banks: Array,
-    transactions: Array,
-    cash_log: Array,
-    incoming_cheques: Array,
-    outgoing_cheques: Array,
+    transactions: Object,
+    cash_log: Object,
+    incoming_cheques: Object,
+    outgoing_cheques: Object,
     employees: Array,
+    filters: Object,
 });
 
 // State
@@ -32,9 +35,21 @@ const isAddBankModalOpen = ref(false);
 const selectedCheque = ref(null);
 
 // Filters
-const bankFilter = ref('all');
-const dateFrom = ref('');
-const dateTo = ref('');
+const bankFilter = ref(props.filters?.bank || 'all');
+const dateFrom = ref(props.filters?.date_from || '');
+const dateTo = ref(props.filters?.date_to || '');
+
+watch([bankFilter, dateFrom, dateTo], () => {
+    router.get('/banks', {
+        bank: bankFilter.value,
+        date_from: dateFrom.value,
+        date_to: dateTo.value,
+    }, {
+        preserveState: true,
+        preserveScroll: true,
+        replace: true,
+    });
+});
 
 // Forms
 const chequeForm = useForm({
@@ -72,29 +87,6 @@ const bankForm = useForm({
     balance: 0,
 });
 
-// Pagination config
-const txPage = ref(1);
-const txPerPage = ref(10);
-const filteredTransactions = computed(() => {
-    let txs = props.transactions;
-    if (bankFilter.value !== 'all') txs = txs.filter(t => t.bank?.name === bankFilter.value);
-    if (dateFrom.value) txs = txs.filter(t => t.date >= dateFrom.value);
-    if (dateTo.value)   txs = txs.filter(t => t.date <= dateTo.value);
-    return txs;
-});
-const txTotalPages = computed(() => Math.max(1, Math.ceil(filteredTransactions.value.length / txPerPage.value)));
-const paginatedTransactions = computed(() => filteredTransactions.value.slice((txPage.value - 1) * txPerPage.value, txPage.value * txPerPage.value));
-
-const cashPage = ref(1);
-const cashPerPage = ref(10);
-const cashTotalPages = computed(() => Math.max(1, Math.ceil(props.cash_log.length / cashPerPage.value)));
-const paginatedCashLog = computed(() => props.cash_log.slice((cashPage.value - 1) * cashPerPage.value, cashPage.value * cashPerPage.value));
-
-const chequePage = ref(1);
-const chequePerPage = ref(10);
-const activeCheques = computed(() => chequeTab.value === 'incoming' ? props.incoming_cheques : props.outgoing_cheques);
-const chequeTotalPages = computed(() => Math.max(1, Math.ceil(activeCheques.value.length / chequePerPage.value)));
-const paginatedCheques = computed(() => activeCheques.value.slice((chequePage.value - 1) * chequePerPage.value, chequePage.value * chequePerPage.value));
 
 // Actions
 const openAdjustmentModal = (bank = null) => {
@@ -136,12 +128,6 @@ const submitClear = (chequeId) => {
 const formatDate = (date) => new Date(date).toLocaleDateString('en-AE', { day: '2-digit', month: 'short', year: 'numeric' });
 const formatPrice = (amount) => new Intl.NumberFormat('en-AE', { style: 'currency', currency: 'AED' }).format(amount || 0);
 
-function pageRange(current, total) {
-    const delta = 2;
-    const range = [];
-    for (let i = Math.max(1, current - delta); i <= Math.min(total, current + delta); i++) range.push(i);
-    return range;
-}
 </script>
 
 <template>
@@ -243,7 +229,7 @@ function pageRange(current, total) {
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-slate-50">
-                                <tr v-for="tx in paginatedTransactions" :key="tx.id" class="group hover:bg-slate-50/50 transition-colors">
+                                <tr v-for="tx in transactions.data" :key="tx.id" class="group hover:bg-slate-50/50 transition-colors">
                                     <td class="py-6 px-8 text-xl font-bold text-slate-900">{{ formatDate(tx.date) }}</td>
                                     <td class="py-6 px-8">
                                         <div class="text-xl font-black text-slate-900">{{ tx.description }}</div>
@@ -258,7 +244,7 @@ function pageRange(current, total) {
                                         <span class="inline-block px-5 py-2 rounded-full text-base font-black uppercase tracking-widest border border-slate-100 bg-slate-50 text-slate-600">{{ tx.bank?.name || 'N/A' }}</span>
                                     </td>
                                 </tr>
-                                <tr v-if="filteredTransactions.length === 0">
+                                <tr v-if="transactions.data.length === 0">
                                     <td colspan="4" class="py-20 text-center italic text-slate-400 font-bold">No entries found.</td>
                                 </tr>
                             </tbody>
@@ -266,20 +252,7 @@ function pageRange(current, total) {
                     </div>
 
                     <!-- Pagination Controls -->
-                    <div v-if="txTotalPages > 1" class="flex items-center justify-between pt-6 border-t border-slate-100">
-                        <div class="text-xs font-bold text-slate-400 uppercase tracking-widest">Page {{ txPage }} of {{ txTotalPages }}</div>
-                        <div class="flex gap-2">
-                            <button @click="txPage--" :disabled="txPage === 1" class="p-2 rounded-lg bg-slate-50 text-slate-400 hover:text-indigo-600 disabled:opacity-50 transition-all">
-                                <span class="material-symbols-outlined">chevron_left</span>
-                            </button>
-                            <div class="flex gap-1">
-                                <button v-for="p in pageRange(txPage, txTotalPages)" :key="p" @click="txPage = p" :class="txPage === p ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'" class="w-8 h-8 rounded-lg text-xs font-black transition-all">{{ p }}</button>
-                            </div>
-                            <button @click="txPage++" :disabled="txPage === txTotalPages" class="p-2 rounded-lg bg-slate-50 text-slate-400 hover:text-indigo-600 disabled:opacity-50 transition-all">
-                                <span class="material-symbols-outlined">chevron_right</span>
-                            </button>
-                        </div>
-                    </div>
+                    <Pagination :links="transactions.links" :meta="transactions" />
                 </div>
 
                 <!-- Cheques and Cash Log (Simplified for brevity, assuming standard table) -->
@@ -294,14 +267,14 @@ function pageRange(current, total) {
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr v-for="tx in paginatedCashLog" :key="tx.id" class="border-b border-slate-50">
+                                <tr v-for="tx in cash_log.data" :key="tx.id" class="border-b border-slate-50">
                                     <td class="py-6 px-8 text-xl font-bold">{{ formatDate(tx.date) }}</td>
                                     <td class="py-6 px-8 text-xl text-slate-600 font-medium">{{ tx.description }}</td>
                                     <td class="py-6 px-8 text-right text-2xl font-black" :class="tx.type === 'deposit' ? 'text-emerald-600' : 'text-rose-600'">
                                         {{ tx.type === 'deposit' ? '+' : '-' }} {{ formatPrice(tx.amount) }}
                                     </td>
                                 </tr>
-                                <tr v-if="props.cash_log.length === 0">
+                                <tr v-if="cash_log.data.length === 0">
                                     <td colspan="3" class="py-20 text-center italic text-slate-400 font-bold">No cash transactions logged yet.</td>
                                 </tr>
                             </tbody>
@@ -309,20 +282,7 @@ function pageRange(current, total) {
                      </div>
 
                      <!-- Pagination -->
-                     <div v-if="cashTotalPages > 1" class="flex items-center justify-between pt-6 border-t border-slate-100">
-                        <div class="text-xs font-bold text-slate-400 uppercase tracking-widest">Page {{ cashPage }} of {{ cashTotalPages }}</div>
-                        <div class="flex gap-2">
-                            <button @click="cashPage--" :disabled="cashPage === 1" class="p-2 rounded-lg bg-slate-50 text-slate-400 hover:text-indigo-600 disabled:opacity-50 transition-all">
-                                <span class="material-symbols-outlined">chevron_left</span>
-                            </button>
-                            <div class="flex gap-1">
-                                <button v-for="p in pageRange(cashPage, cashTotalPages)" :key="p" @click="cashPage = p" :class="cashPage === p ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'" class="w-8 h-8 rounded-lg text-xs font-black transition-all">{{ p }}</button>
-                            </div>
-                            <button @click="cashPage++" :disabled="cashPage === cashTotalPages" class="p-2 rounded-lg bg-slate-50 text-slate-400 hover:text-indigo-600 disabled:opacity-50 transition-all">
-                                <span class="material-symbols-outlined">chevron_right</span>
-                            </button>
-                        </div>
-                    </div>
+                     <Pagination :links="cash_log.links" :meta="cash_log" />
                 </div>
                 <!-- Cheques Tab -->
                 <div v-if="activeSection === 'cheques'" class="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -345,7 +305,7 @@ function pageRange(current, total) {
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-slate-50">
-                                <tr v-for="cheque in paginatedCheques" :key="cheque.id" class="group hover:bg-slate-50/50 transition-colors">
+                                <tr v-for="cheque in (chequeTab === 'incoming' ? incoming_cheques.data : outgoing_cheques.data)" :key="cheque.id" class="group hover:bg-slate-50/50 transition-colors">
                                     <td class="py-6 px-8">
                                         <div class="text-xl font-bold text-slate-900">{{ formatDate(cheque.due_date) }}</div>
                                         <div v-if="new Date(cheque.due_date) < new Date() && cheque.status === 'pending'" class="text-[10px] font-black text-rose-500 uppercase tracking-widest">Overdue</div>
@@ -386,7 +346,7 @@ function pageRange(current, total) {
                                         </div>
                                     </td>
                                 </tr>
-                                <tr v-if="activeCheques.length === 0">
+                                <tr v-if="(chequeTab === 'incoming' ? incoming_cheques.data.length : outgoing_cheques.data.length) === 0">
                                     <td colspan="5" class="py-20 text-center italic text-slate-400 font-bold">No active cheques in this category.</td>
                                 </tr>
                             </tbody>
@@ -394,20 +354,7 @@ function pageRange(current, total) {
                     </div>
 
                     <!-- Pagination -->
-                    <div v-if="chequeTotalPages > 1" class="flex items-center justify-between pt-6 border-t border-slate-100">
-                        <div class="text-xs font-bold text-slate-400 uppercase tracking-widest">Page {{ chequePage }} of {{ chequeTotalPages }}</div>
-                        <div class="flex gap-2">
-                            <button @click="chequePage--" :disabled="chequePage === 1" class="p-2 rounded-lg bg-slate-50 text-slate-400 hover:text-indigo-600 disabled:opacity-50 transition-all">
-                                <span class="material-symbols-outlined">chevron_left</span>
-                            </button>
-                            <div class="flex gap-1">
-                                <button v-for="p in pageRange(chequePage, chequeTotalPages)" :key="p" @click="chequePage = p" :class="chequePage === p ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'" class="w-8 h-8 rounded-lg text-xs font-black transition-all">{{ p }}</button>
-                            </div>
-                            <button @click="chequePage++" :disabled="chequePage === chequeTotalPages" class="p-2 rounded-lg bg-slate-50 text-slate-400 hover:text-indigo-600 disabled:opacity-50 transition-all">
-                                <span class="material-symbols-outlined">chevron_right</span>
-                            </button>
-                        </div>
-                    </div>
+                    <Pagination :links="(chequeTab === 'incoming' ? incoming_cheques.links : outgoing_cheques.links)" :meta="(chequeTab === 'incoming' ? incoming_cheques : outgoing_cheques)" />
                 </div>
             </div>
         </div>

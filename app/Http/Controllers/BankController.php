@@ -15,22 +15,40 @@ class BankController extends Controller
     /**
      * Display the Bank and Cheque System page.
      */
-    public function index()
+    public function index(Request $request)
     {
         $banks = Bank::all();
         
-        $transactions = BankTransaction::with('bank')->latest('date')->latest('id')->take(500)->get();
+        $txQuery = BankTransaction::with('bank')->latest('date')->latest('id');
+        
+        if ($request->bank && $request->bank !== 'all') {
+            $txQuery->whereHas('bank', function($q) use ($request) {
+                $q->where('name', $request->bank);
+            });
+        }
+        
+        if ($request->date_from) {
+            $txQuery->where('date', '>=', $request->date_from);
+        }
+        
+        if ($request->date_to) {
+            $txQuery->where('date', '<=', $request->date_to);
+        }
+
+        $transactions = $txQuery->paginate(15, ['*'], 'tx_page')->withQueryString();
+        
         $cash_log = BankTransaction::whereHas('bank', function($query) {
             $query->where('name', 'like', '%Cash%');
-        })->latest('date')->latest('id')->take(500)->get();
+        })->latest('date')->latest('id')->paginate(15, ['*'], 'cash_page')->withQueryString();
 
         return Inertia::render('Banks', [
             'banks' => $banks,
             'transactions' => $transactions,
             'cash_log' => $cash_log,
-            'incoming_cheques' => Cheque::with('bank')->where('type', 'incoming')->latest('due_date')->get(),
-            'outgoing_cheques' => Cheque::with('bank')->where('type', 'outgoing')->latest('due_date')->get(),
+            'incoming_cheques' => Cheque::with('bank')->where('type', 'incoming')->latest('due_date')->paginate(15, ['*'], 'in_cheque_page')->withQueryString(),
+            'outgoing_cheques' => Cheque::with('bank')->where('type', 'outgoing')->latest('due_date')->paginate(15, ['*'], 'out_cheque_page')->withQueryString(),
             'employees' => \App\Models\Employee::all(['id', 'name']),
+            'filters' => $request->only(['bank', 'date_from', 'date_to']),
         ]);
     }
 

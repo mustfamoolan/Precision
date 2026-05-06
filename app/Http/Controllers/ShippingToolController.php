@@ -16,16 +16,18 @@ class ShippingToolController extends Controller
         $query = Shipment::withCount('sales');
 
         if ($request->filled('search')) {
-            $query->where('container_number', 'like', '%' . $request->search . '%')
+            $query->where(function($q) use ($request) {
+                $q->where('container_number', 'like', '%' . $request->search . '%')
                   ->orWhere('vessel_name', 'like', '%' . $request->search . '%')
                   ->orWhere('supplier_name', 'like', '%' . $request->search . '%');
+            });
         }
 
         if ($request->filled('status')) {
             $query->where('status', $request->status);
         }
 
-        $shipments = $query->latest()->get()->map(function ($s) {
+        $shipments = $query->latest()->paginate(15)->through(function ($s) {
             $totalCosts = $s->shipping_cost + $s->import_tax + $s->clearance_fees + $s->other_costs;
             $balance    = max(0, $s->invoice_amount - $s->paid_amount);
             $payStatus  = $s->invoice_amount <= 0 ? 'N/A'
@@ -36,19 +38,20 @@ class ShippingToolController extends Controller
                 'balance_due'    => $balance,
                 'payment_status' => $payStatus,
             ]);
-        });
+        })->withQueryString();
 
+        // Summary Data (Global)
         $summary = [
-            'total_shipments'       => $shipments->count(),
-            'in_transit'            => $shipments->whereIn('status', ['On Board', 'In Transit'])->count(),
-            'arrived'               => $shipments->whereIn('status', ['Delivered', 'Completed'])->count(),
-            'total_balance_due'     => $shipments->sum('balance_due'),
-            'total_shipping_costs'  => $shipments->sum('shipping_cost'),
-            'total_tax_clearance'   => $shipments->sum('import_tax') + $shipments->sum('clearance_fees'),
+            'total_shipments'       => Shipment::count(),
+            'in_transit'            => Shipment::whereIn('status', ['On Board', 'In Transit'])->count(),
+            'arrived'               => Shipment::whereIn('status', ['Delivered', 'Completed'])->count(),
+            'total_balance_due'     => Shipment::all()->sum(fn($s) => max(0, $s->invoice_amount - $s->paid_amount)),
+            'total_shipping_costs'  => Shipment::sum('shipping_cost'),
+            'total_tax_clearance'   => Shipment::sum('import_tax') + Shipment::sum('clearance_fees'),
         ];
 
         return Inertia::render('Shipping/Index', [
-            'shipments' => $shipments->values(),
+            'shipments' => $shipments,
             'summary'   => $summary,
             'filters'   => $request->all(['search', 'status']),
         ]);

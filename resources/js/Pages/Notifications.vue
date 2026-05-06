@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import MainLayout from '@/Layouts/MainLayout.vue';
+import Pagination from '@/Components/Pagination.vue';
 
 defineOptions({ layout: MainLayout });
 
@@ -259,18 +260,8 @@ const groups = computed(() => {
         </div>
 
         <!-- Pagination -->
-        <div class="flex justify-center gap-2 pb-10" v-if="notifications.last_page > 1">
-            <Link 
-                v-for="link in notifications.links" 
-                :key="link.label"
-                :href="link.url || '#'"
-                v-html="link.label"
-                class="px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all"
-                :class="[
-                    link.active ? 'bg-primary text-on-primary shadow-lg shadow-primary/20' : 'bg-surface-container-lowest border border-outline-variant/20 text-outline hover:text-on-surface hover:bg-surface-container-low',
-                    !link.url ? 'opacity-30 cursor-not-allowed' : ''
-                ]"
-            ></Link>
+        <div class="px-8 pb-10">
+            <Pagination :links="notifications.links" :meta="notifications" />
         </div>
     </div>
 </template>

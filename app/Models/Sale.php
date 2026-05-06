@@ -24,7 +24,8 @@ class Sale extends Model
         'shipping_status',
         'bank_id',
         'shipment_id',
-        'items'
+        'items',
+        'customer_address'
     ];
 
     protected $casts = [

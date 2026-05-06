@@ -9,12 +9,13 @@ import SelectInput from '@/Components/SelectInput.vue';
 import Badge from '@/Components/Badge.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
+import Pagination from '@/Components/Pagination.vue';
 import { jsPDF } from 'jspdf';
 
 defineOptions({ layout: MainLayout });
 
 const props = defineProps({
-    expenses: Array,
+    expenses: Object,
     employees: Array,
     banks: Array,
     summary: Object,
@@ -145,7 +146,7 @@ const exportPDF = () => {
     addRow(cols, widths, true); 
     addLine();
     
-    props.expenses.forEach(expense => {
+    props.expenses.data.forEach(expense => {
         const desc = expense.description.length > 40 ? expense.description.substring(0, 37) + '...' : expense.description;
         const supp = (expense.supplier_person || expense.employee?.name || '').substring(0, 20);
         
@@ -272,7 +273,7 @@ const statuses = ['Paid', 'Partial', 'Unpaid'];
                 <div class="flex items-center gap-4 w-full xl:w-auto">
                     <div>
                         <h3 class="text-xl font-black text-slate-900 uppercase tracking-tight">Transactions</h3>
-                        <p class="text-sm text-slate-400 font-medium mt-0.5">{{ expenses.length }} records found</p>
+                        <p class="text-sm text-slate-400 font-medium mt-0.5">{{ expenses.total }} records found</p>
                     </div>
 
                     <div class="h-8 w-px bg-slate-200 mx-2 hidden sm:block"></div>
@@ -317,7 +318,7 @@ const statuses = ['Paid', 'Partial', 'Unpaid'];
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-50">
-                        <tr v-for="expense in expenses" :key="expense.id" class="group hover:bg-slate-50/50 transition-colors">
+                        <tr v-for="expense in expenses.data" :key="expense.id" class="group hover:bg-slate-50/50 transition-colors">
                             <td class="py-6 px-8 text-xl font-bold text-slate-500 whitespace-nowrap">{{ expense.date }}</td>
                             <td class="py-6 px-8 text-xl font-bold text-slate-900 whitespace-nowrap">{{ expense.expense_number || expense.id }}</td>
                             <td class="py-6 px-8 text-xl font-medium text-slate-600 min-w-[200px]">{{ expense.description }}</td>
@@ -340,7 +341,7 @@ const statuses = ['Paid', 'Partial', 'Unpaid'];
                                 </div>
                             </td>
                         </tr>
-                        <tr v-if="expenses.length === 0">
+                        <tr v-if="expenses.data.length === 0">
                             <td colspan="8" class="py-20 text-center text-slate-400 italic text-sm">
                                 <span class="material-symbols-outlined text-4xl block mb-2 opacity-50">search_off</span>
                                 No expenses found for the selected filters.
@@ -348,6 +349,10 @@ const statuses = ['Paid', 'Partial', 'Unpaid'];
                         </tr>
                     </tbody>
                 </table>
+            </div>
+
+            <div class="p-6 border-t border-slate-100">
+                <Pagination :links="expenses.links" :meta="expenses" />
             </div>
         </div>
 

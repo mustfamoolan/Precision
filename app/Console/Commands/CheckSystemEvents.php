@@ -23,7 +23,7 @@ class CheckSystemEvents extends Command
             return;
         }
 
-        // Check Cheques
+        // Check Cheques ONLY
         $cheques = Cheque::where('status', 'pending')->get();
         foreach ($cheques as $cheque) {
             if (!$cheque->due_date) continue;
@@ -31,7 +31,8 @@ class CheckSystemEvents extends Command
             $dueDate = Carbon::parse($cheque->due_date)->startOfDay();
             $daysUntil = $today->diffInDays($dueDate, false);
 
-            if ($daysUntil <= 3 && $daysUntil >= 0) {
+            // Notify if due within 5 days or overdue
+            if ($daysUntil <= 5 && $daysUntil >= 0) {
                 $label = $daysUntil == 0 ? "DUE TODAY" : "due in $daysUntil days";
                 $this->notifyUsers($users, 'financial', $cheque->id, "Cheque Alert: {$cheque->party_name}", "Cheque #{$cheque->cheque_number} is $label. Amount: AED {$cheque->amount}.", 'payments', '/banks');
             } elseif ($daysUntil < 0) {
@@ -39,21 +40,7 @@ class CheckSystemEvents extends Command
             }
         }
 
-        // Check Shipments
-        $shipments = Shipment::whereNotIn('status', ['Delivered', 'Completed'])->get();
-        foreach ($shipments as $shipment) {
-            if (!$shipment->arrival_date) continue;
-            
-            $etaDate = Carbon::parse($shipment->arrival_date)->startOfDay();
-            $daysUntil = $today->diffInDays($etaDate, false);
-
-            if ($daysUntil <= 5 && $daysUntil >= 0) {
-                $label = $daysUntil == 0 ? "ARRIVING TODAY" : "arriving in $daysUntil days";
-                $this->notifyUsers($users, 'shipping', $shipment->id, "Shipment ETA: {$shipment->container_number}", "Container {$shipment->container_number} is $label.", 'local_shipping', "/shipping/{$shipment->id}");
-            }
-        }
-
-        $this->info('System events checked.');
+        $this->info('Cheque events checked.');
     }
 
     protected function notifyUsers($users, $type, $resourceId, $title, $message, $icon, $link)

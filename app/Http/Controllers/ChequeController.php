@@ -15,7 +15,7 @@ class ChequeController extends Controller
      */
     public function index()
     {
-        return Cheque::with('bank')->latest('due_date')->get();
+        return Cheque::with('bank')->latest('due_date')->latest('id')->get();
     }
 
     /**

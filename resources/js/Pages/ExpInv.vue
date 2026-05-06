@@ -9,12 +9,13 @@ import SelectInput from '@/Components/SelectInput.vue';
 import Badge from '@/Components/Badge.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
+import Pagination from '@/Components/Pagination.vue';
 import { jsPDF } from 'jspdf';
 
 defineOptions({ layout: MainLayout });
 
 const props = defineProps({
-    sales: Array,
+    sales: Object,
     summary: Object,
     filters: Object,
     banks: Array,
@@ -57,6 +58,9 @@ const form = useForm({
     shipping_status: 'On Board',
     bank_id: '',
     items: [],
+    customer_address: '',
+    subtotal: 0,
+    vat: 0,
 });
 
 const paymentForm = useForm({
@@ -96,11 +100,12 @@ const openEditModal = (sale) => {
     form.shipping_status = sale.shipping_status;
     form.bank_id = sale.bank_id || '';
     form.items = sale.items || [];
+    form.customer_address = sale.customer_address || '';
     showAddModal.value = true;
 };
 
 const addItem = () => {
-    form.items.push({ inventory_id: '', name: '', quantity: 1 });
+    form.items.push({ inventory_id: '', name: '', quantity: 1, rate: 0 });
 };
 
 const removeItem = (index) => {
@@ -111,6 +116,7 @@ const onInventorySelect = (index, invId) => {
     const inv = props.inventory.find(i => i.id == invId);
     if (inv) {
         form.items[index].name = inv.name;
+        form.items[index].rate = inv.selling_price || 0;
     }
 };
 
@@ -136,6 +142,14 @@ const confirmDelete = (id) => {
         router.delete(`/sales/${id}`);
     }
 };
+
+// Auto-fill address when customer is selected
+watch(() => form.customer_name, (newName) => {
+    const customer = props.customers.find(c => c.name === newName);
+    if (customer) {
+        form.customer_address = customer.address || '';
+    }
+});
 
 const submit = () => {
     // Add prefix if not already there
@@ -182,91 +196,189 @@ const statuses = [{label: 'All Status', value: 'all'}, {label: 'Paid', value: 'p
 const exportInvoicePDF = (sale) => {
     const doc = new jsPDF();
     const W = doc.internal.pageSize.getWidth();
+    const H = doc.internal.pageSize.getHeight();
     
-    // Header styling
-    doc.setFillColor(30, 41, 59);
-    doc.rect(0, 0, W, 40, 'F');
+    const renderArabic = (text, x, y, size, color = '#1e293b', align = 'left') => {
+        if (!text) return;
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Scale for high resolution
+        const scale = 8; 
+        const fontSizePx = size * scale;
+        ctx.font = `bold ${fontSizePx}px Arial, sans-serif`;
+        
+        const metrics = ctx.measureText(text);
+        const textWidth = metrics.width;
+        
+        canvas.width = textWidth + (10 * scale);
+        canvas.height = fontSizePx * 2;
+        
+        // Re-set font after resizing canvas
+        ctx.fillStyle = color;
+        ctx.font = `bold ${fontSizePx}px Arial, sans-serif`;
+        ctx.textBaseline = 'middle';
+        ctx.fillText(text, 0, canvas.height / 2);
+        
+        const imgData = canvas.toDataURL('image/png');
+        
+        // Convert Pixels to MM (approx 1mm = 3.78px at 96dpi, but jsPDF uses 72dpi/pts)
+        // A better way: the height in mm should be approx size * 0.3527
+        const h = size * 0.45; // Adjusted height in mm
+        const w = (textWidth / fontSizePx) * h;
+        
+        const finalX = align === 'right' ? (x - w) : x;
+        doc.addImage(imgData, 'PNG', finalX, y - (h / 2), w, h);
+    };
+
+    const img = new Image();
+    img.src = '/assets/images/invoice.png';
     
-    doc.setFontSize(22);
-    doc.setTextColor(255, 255, 255);
-    doc.setFont('helvetica', 'bold');
-    doc.text('EXPORT INVOICE', 15, 20);
-    
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`DATE: ${sale.date}`, 15, 30);
-    doc.text(`INVOICE #: ${sale.invoice_number}`, W - 60, 30);
-    
-    // Content
-    doc.setTextColor(30, 41, 59);
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
-    doc.text('BILL TO:', 15, 55);
-    
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(11);
-    doc.text(sale.customer_name, 15, 62);
-    
-    // Details Box
-    doc.setDrawColor(226, 232, 240);
-    doc.setFillColor(248, 250, 252);
-    doc.roundedRect(15, 75, W - 30, 30, 3, 3, 'FD');
-    
-    doc.setFont('helvetica', 'bold');
-    doc.text('Container / Shipment #:', 20, 85);
-    doc.text('Shipping Status:', 20, 95);
-    
-    doc.setFont('helvetica', 'normal');
-    doc.text(sale.container_number || 'N/A', 80, 85);
-    doc.text(sale.shipping_status || 'N/A', 80, 95);
-    
-    // Table
-    doc.setFillColor(241, 245, 249);
-    doc.rect(15, 115, W - 30, 10, 'F');
-    doc.setFont('helvetica', 'bold');
-    doc.text('Description', 20, 122);
-    doc.text('Total', W - 35, 122, { align: 'right' });
-    
-    doc.line(15, 125, W - 15, 125);
-    doc.setFont('helvetica', 'normal');
-    
-    let currentY = 135;
-    if (sale.items && sale.items.length > 0) {
-        sale.items.forEach((item, index) => {
-            doc.text(`${item.name} (Qty: ${item.quantity})`, 20, currentY);
-            if (index === 0) {
-                doc.text(formatCurrency(sale.amount), W - 35, currentY, { align: 'right' });
+    img.onload = () => {
+        doc.addImage(img, 'PNG', 0, 0, W, H);
+        doc.setTextColor(30, 41, 59);
+        
+        // --- Header Section ---
+        // Left: Bill To
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Bill To', 20, 75);
+        
+        doc.setFontSize(11);
+        const hasArabic = /[\u0600-\u06FF]/.test(sale.customer_name);
+        if (hasArabic) {
+            renderArabic(sale.customer_name, 20, 82, 12);
+        } else {
+            doc.text(sale.customer_name || 'Walking Customer', 20, 82);
+        }
+        
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+        if (sale.customer_address) {
+            const addrArabic = /[\u0600-\u06FF]/.test(sale.customer_address);
+            if (addrArabic) {
+                renderArabic(sale.customer_address, 20, 87, 9, '#64748b');
+            } else {
+                doc.text(sale.customer_address, 20, 87);
             }
-            currentY += 10;
-        });
-    } else {
-        doc.text(`Export Sale - ${sale.container_number || 'General'}`, 20, currentY);
-        doc.text(formatCurrency(sale.amount), W - 35, currentY, { align: 'right' });
-    }
-    
-    // Totals
-    const totalY = 160;
-    doc.line(W - 80, totalY, W - 15, totalY);
-    
-    doc.setFont('helvetica', 'bold');
-    doc.text('Total Amount:', W - 80, totalY + 10);
-    doc.text(formatCurrency(sale.amount), W - 35, totalY + 10, { align: 'right' });
-    
-    doc.setTextColor(16, 185, 129);
-    doc.text('Total Paid:', W - 80, totalY + 20);
-    doc.text(formatCurrency(sale.paid_amount), W - 35, totalY + 20, { align: 'right' });
-    
-    doc.setTextColor(239, 68, 68);
-    doc.text('Balance Due:', W - 80, totalY + 30);
-    doc.text(formatCurrency(sale.due_amount), W - 35, totalY + 30, { align: 'right' });
-    
-    // Footer
-    doc.setFontSize(8);
-    doc.setTextColor(148, 163, 184);
-    doc.text('Thank you for your business.', W / 2, 280, { align: 'center' });
-    
-    doc.save(`Invoice_${sale.invoice_number}.pdf`);
+        } else {
+            doc.text('Al Ain, United Arab Emirates.', 20, 87);
+        }
+        doc.text('TRN: 100267536900003', 20, 92);
+
+        // Right: Invoice Meta
+        const metaX = W - 80;
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9);
+        doc.text('Invoice#', metaX, 75);
+        doc.text('Invoice Date', metaX, 82);
+        doc.text('Payment Terms', metaX, 89);
+        
+        doc.setFont('helvetica', 'normal');
+        doc.text(sale.invoice_number, metaX + 30, 75);
+        doc.text(sale.date, metaX + 30, 82);
+        doc.text('Due on Receipt', metaX + 30, 89);
+
+        // --- Table Section ---
+        const tableY = 105;
+        const rowHeight = 8;
+        const totalRows = 12;
+
+        // Header
+        doc.setFillColor(248, 250, 252);
+        doc.rect(20, tableY, W - 40, rowHeight, 'F');
+        doc.setDrawColor(200, 200, 200);
+        doc.rect(20, tableY, W - 40, rowHeight, 'D');
+
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'bold');
+        doc.text('#', 22, tableY + 5.5);
+        doc.text('Description', 30, tableY + 5.5);
+        doc.text('Qty', W - 85, tableY + 5.5, { align: 'right' });
+        doc.text('Rate', W - 65, tableY + 5.5, { align: 'right' });
+        doc.text('VAT 5%', W - 45, tableY + 5.5, { align: 'right' });
+        doc.text('Amount', W - 25, tableY + 5.5, { align: 'right' });
+
+        doc.setFont('helvetica', 'normal');
+        let currentY = tableY + rowHeight;
+        let subtotal = 0;
+        let totalVat = 0;
+
+        for (let i = 0; i < totalRows; i++) {
+            const item = sale.items && sale.items[i];
+            doc.rect(20, currentY, W - 40, rowHeight, 'D');
+            doc.line(28, currentY, 28, currentY + rowHeight);
+            doc.line(W - 95, currentY, W - 95, currentY + rowHeight);
+            doc.line(W - 75, currentY, W - 75, currentY + rowHeight);
+            doc.line(W - 55, currentY, W - 55, currentY + rowHeight);
+            doc.line(W - 35, currentY, W - 35, currentY + rowHeight);
+
+            if (item) {
+                const qty = parseFloat(item.quantity || 0);
+                const rate = parseFloat(item.rate || 0);
+                const lineTotal = qty * rate;
+                const lineVat = lineTotal * 0.05;
+                subtotal += lineTotal;
+                totalVat += lineVat;
+
+                doc.text(String(i + 1), 24, currentY + 5.5, { align: 'center' });
+                
+                const itemName = item.name || 'Product Item';
+                if (/[\u0600-\u06FF]/.test(itemName)) {
+                    renderArabic(itemName, 30, currentY + 5.5, 9);
+                } else {
+                    doc.text(itemName, 30, currentY + 5.5);
+                }
+
+                doc.text(qty.toFixed(2), W - 77, currentY + 5.5, { align: 'right' });
+                doc.text(rate.toFixed(2), W - 57, currentY + 5.5, { align: 'right' });
+                doc.text(lineVat.toFixed(2), W - 37, currentY + 5.5, { align: 'right' });
+                doc.text((lineTotal + lineVat).toFixed(2), W - 22, currentY + 5.5, { align: 'right' });
+            }
+            currentY += rowHeight;
+        }
+
+        if (subtotal === 0 && sale.amount > 0) {
+            subtotal = parseFloat(sale.amount) / 1.05;
+            totalVat = subtotal * 0.05;
+        }
+
+        // --- Totals Section ---
+        currentY += 5;
+        const totalX = W - 70;
+        doc.setFontSize(9);
+        doc.text('Sub Total (VAT)', totalX, currentY);
+        doc.text(totalVat.toFixed(2), W - 25, currentY, { align: 'right' });
+        
+        currentY += 7;
+        doc.text('Total Taxable Amount', totalX, currentY);
+        doc.text(subtotal.toFixed(2), W - 25, currentY, { align: 'right' });
+        
+        currentY += 7;
+        doc.setFont('helvetica', 'bold');
+        doc.text('Total', totalX, currentY);
+        doc.text(`AED ${(subtotal + totalVat).toFixed(2)}`, W - 25, currentY, { align: 'right' });
+        
+        currentY += 7;
+        doc.setDrawColor(200, 200, 200);
+        doc.line(totalX, currentY - 2, W - 20, currentY - 2);
+        doc.text('Balance Due', totalX, currentY + 3);
+        doc.text(`AED ${parseFloat(sale.due_amount).toFixed(2)}`, W - 25, currentY + 3, { align: 'right' });
+
+        // Footer Section
+        const footerY = H - 60;
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'normal');
+        doc.text('Customer Signature & Date _________________________', 20, footerY);
+        doc.setFontSize(7);
+        doc.text('Received the above material in good condition.', 65, footerY + 4);
+
+        doc.save(`Invoice_${sale.invoice_number}.pdf`);
+    };
+    img.onerror = () => alert('Template image not found at /assets/images/invoice.png');
 };
+
+
 
 </script>
 
@@ -378,7 +490,7 @@ const exportInvoicePDF = (sale) => {
                 <div class="flex items-center gap-4 w-full xl:w-auto">
                     <div>
                         <h3 class="text-xl font-black text-slate-900 uppercase tracking-tight">Export Records</h3>
-                        <p class="text-sm text-slate-400 font-medium mt-0.5">{{ sales.length }} records found</p>
+                        <p class="text-sm text-slate-400 font-medium mt-0.5">{{ sales.total }} records found</p>
                     </div>
 
                     <div class="h-8 w-px bg-slate-200 mx-2 hidden sm:block"></div>
@@ -424,7 +536,7 @@ const exportInvoicePDF = (sale) => {
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-50">
-                        <tr v-for="sale in sales" :key="sale.id" class="group hover:bg-slate-50/50 transition-colors">
+                        <tr v-for="sale in sales.data" :key="sale.id" class="group hover:bg-slate-50/50 transition-colors">
                             <td class="py-6 px-8 text-xl font-bold text-slate-900 whitespace-nowrap">{{ sale.invoice_number }}</td>
                             <td class="py-6 px-8 text-xl font-bold text-slate-500 whitespace-nowrap">{{ sale.date }}</td>
                             <td class="py-6 px-8 text-xl font-medium text-slate-600 whitespace-nowrap">{{ sale.customer_name }}</td>
@@ -473,7 +585,7 @@ const exportInvoicePDF = (sale) => {
                                 </div>
                             </td>
                         </tr>
-                        <tr v-if="sales.length === 0">
+                        <tr v-if="sales.data.length === 0">
                             <td colspan="9" class="py-20 text-center text-slate-400 italic text-sm">
                                 <span class="material-symbols-outlined text-4xl block mb-2 opacity-50">search_off</span>
                                 No export invoices found for the selected filters.
@@ -481,6 +593,10 @@ const exportInvoicePDF = (sale) => {
                         </tr>
                     </tbody>
                 </table>
+            </div>
+
+            <div class="p-6 border-t border-slate-100">
+                <Pagination :links="sales.links" :meta="sales" />
             </div>
         </div>
 
@@ -534,6 +650,17 @@ const exportInvoicePDF = (sale) => {
                     />
                 </FormField>
 
+                <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex justify-between">
+                    <div>
+                        <p class="text-[10px] font-black text-slate-400 uppercase">Calculated Total (Inc. 5% VAT)</p>
+                        <p class="text-xl font-black text-slate-900">{{ formatCurrency(form.items.reduce((acc, i) => acc + (i.quantity * i.rate * 1.05), 0)) }}</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-[10px] font-black text-slate-400 uppercase">Subtotal</p>
+                        <p class="text-sm font-bold text-slate-600">{{ formatCurrency(form.items.reduce((acc, i) => acc + (i.quantity * i.rate), 0)) }}</p>
+                    </div>
+                </div>
+
                 <!-- Items Section -->
                 <div class="border-t border-slate-100 pt-5 mt-5">
                     <div class="flex justify-between items-center mb-4">
@@ -542,9 +669,9 @@ const exportInvoicePDF = (sale) => {
                     </div>
 
                     <div class="space-y-3">
-                        <div v-for="(item, index) in form.items" :key="index" class="flex gap-3 items-end bg-slate-50 p-3 rounded-xl border border-slate-100">
-                            <div class="flex-1">
-                                <label class="text-[9px] font-black text-slate-400 uppercase mb-1 block">Item from Warehouse</label>
+                        <div v-for="(item, index) in form.items" :key="index" class="flex flex-wrap gap-3 items-end bg-slate-50 p-3 rounded-xl border border-slate-100">
+                            <div class="flex-1 min-w-[150px]">
+                                <label class="text-[9px] font-black text-slate-400 uppercase mb-1 block">Product</label>
                                 <SelectInput 
                                     v-model="item.inventory_id" 
                                     :options="inventory.map(i => ({ label: `${i.name} (${i.sku})`, value: i.id }))"
@@ -552,9 +679,17 @@ const exportInvoicePDF = (sale) => {
                                     placeholder="Choose..."
                                 />
                             </div>
-                            <div class="w-24">
+                            <div class="w-16">
                                 <label class="text-[9px] font-black text-slate-400 uppercase mb-1 block">Qty</label>
                                 <TextInput v-model="item.quantity" type="number" min="1" />
+                            </div>
+                            <div class="w-24">
+                                <label class="text-[9px] font-black text-slate-400 uppercase mb-1 block">Rate</label>
+                                <TextInput v-model="item.rate" type="number" step="0.01" />
+                            </div>
+                            <div class="w-20 text-right pr-2">
+                                <label class="text-[9px] font-black text-slate-400 uppercase mb-1 block">Total</label>
+                                <p class="text-xs font-bold py-2">{{ formatCurrency(item.quantity * item.rate).replace('AED', '') }}</p>
                             </div>
                             <button type="button" @click="removeItem(index)" class="mb-2 text-rose-500 hover:text-rose-700">
                                 <span class="material-symbols-outlined text-[20px]">delete</span>

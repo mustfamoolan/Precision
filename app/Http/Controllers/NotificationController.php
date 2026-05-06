@@ -15,10 +15,11 @@ class NotificationController extends Controller
         $tab = $request->query('tab', 'all');
         $query = Auth::user()->notifications();
 
+        // Strictly show only financial/cheque notifications
+        $query->where('data->type', 'financial');
+
         if ($tab === 'unread') {
             $query->whereNull('read_at');
-        } elseif (in_array($tab, ['reminder', 'financial', 'shipping'])) {
-            $query->where('data->type', $tab);
         }
 
         $notifications = $query->latest()->paginate(20)->withQueryString();

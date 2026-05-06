@@ -3,6 +3,7 @@ import { ref, computed, onMounted, watch, nextTick } from 'vue';
 import { Head, router } from '@inertiajs/vue3';
 import MainLayout from '@/Layouts/MainLayout.vue';
 import Badge from '@/Components/Badge.vue';
+import Pagination from '@/Components/Pagination.vue';
 import { Chart, registerables } from 'chart.js';
 Chart.register(...registerables);
 
@@ -13,7 +14,7 @@ const props = defineProps({
     cash_flow: Array,
     aging: Object,
     top_expenses: Array,
-    ledger: Array,
+    ledger: Object,
     filters: Object,
 });
 
@@ -37,21 +38,7 @@ const applyDateRange = () => {
 const fmt = (v) => new Intl.NumberFormat('en-AE', { style: 'currency', currency: 'AED' }).format(v || 0);
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-AE', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 
-// ─── Ledger Pagination ────────────────────────────────────────────────────────
-const PAGE_SIZES = [10, 25, 50, 100];
-const ledgerPage = ref(1);
-const ledgerPerPage = ref(10);
-const totalPages = computed(() => Math.max(1, Math.ceil(props.ledger.length / ledgerPerPage.value)));
-const paginatedLedger = computed(() => {
-    const s = (ledgerPage.value - 1) * ledgerPerPage.value;
-    return props.ledger.slice(s, s + ledgerPerPage.value);
-});
-watch(ledgerPerPage, () => { ledgerPage.value = 1; });
-function pageRange(cur, total) {
-    const d = 2, r = [];
-    for (let i = Math.max(1, cur - d); i <= Math.min(total, cur + d); i++) r.push(i);
-    return r;
-}
+// Ledger Pagination is now server-side
 
 // ─── Chart.js Bar Chart ───────────────────────────────────────────────────────
 const chartCanvas = ref(null);
@@ -175,11 +162,11 @@ const exportPDF = async () => {
     // ── Section 1: Sales Invoices ────────────────────────────────────────────
     addTitle('SECTION 1 — SALES INVOICES', 13, [30, 41, 59]); y += 2;
     addLine();
-    const salesCols = ['Date', 'Customer', 'Total', 'Paid', 'Due'];
-    const salesW    = [30, 65, 30, 30, 25];
+    const salesCols = ['Date', 'Customer', 'Inv #', 'Total', 'Paid', 'Due'];
+    const salesW    = [25, 55, 25, 25, 25, 25];
     addRow(salesCols, salesW, true); addLine();
-    props.ledger.filter(i => i.type === 'sale').forEach(item => {
-        addRow([fmtDate(item.date), item.name, fmt(item.amount), fmt(item.paid_amount), fmt(item.due_amount)], salesW);
+    props.ledger.data.filter(i => i.type === 'sale').forEach(item => {
+        addRow([fmtDate(item.date), item.name, item.reference, fmt(item.amount), fmt(item.paid_amount), fmt(item.due_amount)], salesW);
     });
     y += 5;
 
@@ -187,26 +174,13 @@ const exportPDF = async () => {
     if (y > 200) { doc.addPage(); y = 20; }
     addTitle('SECTION 2 — EXPENSES', 13, [30, 41, 59]); y += 2;
     addLine();
-    const expCols = ['Date', 'Description', 'Amount'];
-    const expW    = [30, 100, 40];
+    const expCols = ['Date', 'Description', 'Ref #', 'Amount'];
+    const expW    = [25, 85, 25, 35];
     addRow(expCols, expW, true); addLine();
-    props.ledger.filter(i => i.type === 'expense').forEach(item => {
-        addRow([fmtDate(item.date), item.name, fmt(item.amount)], expW);
+    props.ledger.data.filter(i => i.type === 'expense').forEach(item => {
+        addRow([fmtDate(item.date), item.name, item.reference, fmt(item.amount)], expW);
     });
     y += 5;
-
-    // ── Footer Summary ───────────────────────────────────────────────────────
-    if (y > 220) { doc.addPage(); y = 20; }
-    doc.setFillColor(30, 41, 59);
-    doc.rect(14, y, W - 28, 28, 'F');
-    doc.setFontSize(9); doc.setTextColor(148, 163, 184); doc.setFont('helvetica', 'bold');
-    doc.text('FINANCIAL SUMMARY', 20, y + 8);
-    doc.setFontSize(10); doc.setTextColor(255,255,255);
-    doc.text(`Total Sales: ${fmt(props.summary.total_sales)}`, 20, y + 16);
-    doc.text(`Total Expenses: ${fmt(props.summary.total_expenses)}`, 20, y + 23);
-    doc.setTextColor(16, 185, 129);
-    const net = props.summary.total_sales - props.summary.total_expenses;
-    doc.text(`Net: ${fmt(net)}`, 130, y + 20);
 
     doc.save(`financial-report-${props.summary.start_date}.pdf`);
 };
@@ -320,7 +294,7 @@ const exportPDF = async () => {
             <div class="px-10 py-7 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                     <h3 class="text-xl font-black text-slate-900 uppercase tracking-tight">Transaction Ledger</h3>
-                    <p class="text-sm text-slate-400 font-medium mt-0.5">{{ ledger.length }} total entries</p>
+                    <p class="text-sm text-slate-400 font-medium mt-0.5">{{ ledger.total }} total entries</p>
                 </div>
                 <button @click="exportPDF"
                     class="flex items-center gap-2 px-5 py-3 border border-slate-200 rounded-2xl text-xs font-black text-slate-600 hover:bg-slate-50 transition-all active:scale-95"
@@ -336,6 +310,7 @@ const exportPDF = async () => {
                         <tr class="bg-slate-50 text-lg font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
                             <th class="py-6 px-8">Date</th>
                             <th class="py-6 px-8">Transaction Name</th>
+                            <th class="py-6 px-8">Reference #</th>
                             <th class="py-6 px-8">Type</th>
                             <th class="py-6 px-8">Total</th>
                             <th class="py-6 px-8">Paid</th>
@@ -343,13 +318,14 @@ const exportPDF = async () => {
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-50">
-                        <tr v-for="item in paginatedLedger" :key="item.id + item.type"
+                        <tr v-for="item in ledger.data" :key="item.id + item.type"
                             class="group hover:bg-slate-50/50 transition-colors"
                         >
                             <td class="py-6 px-8 text-xl font-bold text-slate-900 whitespace-nowrap">{{ fmtDate(item.date) }}</td>
                             <td class="py-6 px-8">
                                 <div class="text-xl font-bold text-slate-900">{{ item.name }}</div>
                             </td>
+                            <td class="py-6 px-8 text-xl font-black text-indigo-600 whitespace-nowrap">{{ item.reference }}</td>
                             <td class="py-6 px-8">
                                 <span
                                     class="inline-block px-4 py-1.5 rounded-full text-sm font-black uppercase tracking-widest"
@@ -364,36 +340,15 @@ const exportPDF = async () => {
                                 :class="item.due_amount > 0 ? 'text-rose-600' : 'text-slate-300'"
                             >{{ fmt(item.due_amount) }}</td>
                         </tr>
-                        <tr v-if="ledger.length === 0">
-                            <td colspan="6" class="py-20 text-center italic text-slate-400 font-bold">No transactions in this period.</td>
+                        <tr v-if="ledger.data.length === 0">
+                            <td colspan="7" class="py-20 text-center italic text-slate-400 font-bold">No transactions in this period.</td>
                         </tr>
                     </tbody>
                 </table>
             </div>
 
-            <!-- Pagination -->
-            <div v-if="ledger.length > 5" class="flex items-center justify-between px-8 py-4 border-t border-slate-100 bg-slate-50/50">
-                <div class="flex items-center gap-3">
-                    <span class="text-xs font-bold text-slate-400">Rows per page:</span>
-                    <select v-model.number="ledgerPerPage"
-                        class="bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-600 outline-none focus:ring-2 focus:ring-indigo-400 cursor-pointer"
-                    >
-                        <option v-for="s in PAGE_SIZES" :key="s" :value="s">{{ s }}</option>
-                    </select>
-                    <span class="text-xs text-slate-400">{{ ledger.length }} total</span>
-                </div>
-                <div class="flex items-center gap-1">
-                    <button @click="ledgerPage = Math.max(1, ledgerPage - 1)" :disabled="ledgerPage === 1"
-                        class="w-8 h-8 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-100 disabled:opacity-30 transition-all"
-                    >&lsaquo;</button>
-                    <button v-for="p in pageRange(ledgerPage, totalPages)" :key="p" @click="ledgerPage = p"
-                        class="w-8 h-8 rounded-xl text-xs font-black transition-all"
-                        :class="p === ledgerPage ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200' : 'text-slate-500 hover:bg-slate-100'"
-                    >{{ p }}</button>
-                    <button @click="ledgerPage = Math.min(totalPages, ledgerPage + 1)" :disabled="ledgerPage === totalPages"
-                        class="w-8 h-8 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-100 disabled:opacity-30 transition-all"
-                    >&rsaquo;</button>
-                </div>
+            <div class="px-10 py-7 border-t border-slate-100">
+                <Pagination :links="ledger.links" :meta="ledger" />
             </div>
         </div>
     </div>

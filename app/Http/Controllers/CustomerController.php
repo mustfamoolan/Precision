@@ -11,6 +11,7 @@ class CustomerController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
+            'address' => 'nullable|string|max:500',
         ]);
 
         Customer::create($validated);
@@ -22,6 +23,7 @@ class CustomerController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
+            'address' => 'nullable|string|max:500',
         ]);
 
         $customer->update($validated);

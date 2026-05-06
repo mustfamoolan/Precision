@@ -9,21 +9,32 @@ import SelectInput from '@/Components/SelectInput.vue';
 import Badge from '@/Components/Badge.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
+import Pagination from '@/Components/Pagination.vue';
 
 defineOptions({ layout: MainLayout });
 
 const props = defineProps({
-    inventory: Array,
+    inventory: Object,
     brands: Array,
     customers: Array,
     summary: Object,
-    movements: Array,
+    movements: Object,
+    filters: Object,
 });
 
 const activeTab = ref('inventory'); // 'inventory' or 'history'
-const viewMode = ref('brands'); // 'brands' or 'products'
-const selectedBrandId = ref(null);
+const viewMode = ref(props.filters?.brand_id ? 'products' : 'brands'); // 'brands' or 'products'
+const selectedBrandId = ref(props.filters?.brand_id || null);
 const locationTab = ref('all'); // 'all', 'shop', 'warehouse', 'remote'
+const search = ref(props.filters?.search || '');
+
+watch(search, (val) => {
+    router.get('/inventory', { search: val, brand_id: selectedBrandId.value }, {
+        preserveState: true,
+        preserveScroll: true,
+        replace: true,
+    });
+});
 
 const showAddModal = ref(false);
 const showBrandModal = ref(false);
@@ -202,12 +213,8 @@ const locations = [
 ];
 
 const filteredInventory = computed(() => {
-    let items = props.inventory;
+    let items = props.inventory.data;
     
-    if (selectedBrandId.value) {
-        items = items.filter(i => i.brand_id === selectedBrandId.value);
-    }
-
     if (locationTab.value === 'all') return items;
     
     return items.filter(item => {
@@ -221,11 +228,13 @@ const filteredInventory = computed(() => {
 const selectBrand = (brandId) => {
     selectedBrandId.value = brandId;
     viewMode.value = 'products';
+    router.get('/inventory', { brand_id: brandId, search: search.value }, { preserveState: true, preserveScroll: true });
 };
 
 const goBackToBrands = () => {
     selectedBrandId.value = null;
     viewMode.value = 'brands';
+    router.get('/inventory', { search: search.value }, { preserveState: true, preserveScroll: true });
 };
 
 const getBrandName = (id) => {
@@ -239,43 +248,51 @@ const getBrandName = (id) => {
 
     <div class="space-y-6 animate-in fade-in duration-500">
         <!-- Page Header -->
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <div>
-                <div class="flex items-center gap-2">
-                    <button v-if="viewMode === 'products' && selectedBrandId" @click="goBackToBrands" class="p-1 hover:bg-surface-container-low rounded-lg transition-colors">
-                        <span class="material-symbols-outlined text-outline">arrow_back</span>
+        <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+            <div class="flex-1">
+                <div class="flex items-center gap-4">
+                    <button v-if="viewMode === 'products' && selectedBrandId" @click="goBackToBrands" class="w-10 h-10 flex items-center justify-center bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-all active:scale-95 shadow-sm">
+                        <span class="material-symbols-outlined text-slate-600">arrow_back</span>
                     </button>
-                    <h1 class="text-2xl font-headline font-bold text-on-surface tracking-tight">
-                        {{ viewMode === 'brands' ? 'Inventory' : getBrandName(selectedBrandId) }}
-                    </h1>
+                    <div>
+                        <h1 class="text-3xl font-black text-slate-900 tracking-tight">
+                            {{ viewMode === 'brands' ? 'Inventory Hub' : getBrandName(selectedBrandId) }}
+                        </h1>
+                        <p class="text-sm text-slate-500 font-medium">Tracking assets across 3 strategic locations</p>
+                    </div>
                 </div>
-                <p class="text-sm text-outline font-label">Manage products across 3 storage locations</p>
             </div>
-            <div class="flex items-center gap-3">
-                <div class="bg-surface-container-low p-1 rounded-xl flex gap-1 border border-outline-variant/10">
+
+            <div class="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+                <div class="relative group flex-1 lg:flex-none lg:w-64">
+                    <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors">search</span>
+                    <input 
+                        v-model="search"
+                        type="text" 
+                        placeholder="Search items..." 
+                        class="w-full bg-white border border-slate-200 rounded-2xl pl-12 pr-4 py-3 text-sm font-bold text-slate-900 outline-none focus:ring-4 focus:ring-indigo-50 transition-all placeholder:text-slate-400"
+                    />
+                </div>
+
+                <div class="bg-slate-100/50 p-1 rounded-2xl flex gap-1 border border-slate-200 shadow-inner">
                     <button 
                         @click="activeTab = 'inventory'"
-                        :class="[activeTab === 'inventory' ? 'bg-primary text-on-primary shadow-sm' : 'text-outline hover:text-on-surface']"
-                        class="px-4 py-1.5 rounded-lg text-xs font-bold transition-all"
+                        :class="[activeTab === 'inventory' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600']"
+                        class="px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
                     >
-                        Inventory List
+                        Live List
                     </button>
                     <button 
                         @click="activeTab = 'history'"
-                        :class="[activeTab === 'history' ? 'bg-primary text-on-primary shadow-sm' : 'text-outline hover:text-on-surface']"
-                        class="px-4 py-1.5 rounded-lg text-xs font-bold transition-all"
+                        :class="[activeTab === 'history' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600']"
+                        class="px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
                     >
-                        Stock History
+                        Stock Log
                     </button>
                 </div>
                 
-                <SecondaryButton v-if="activeTab === 'inventory'" @click="showBrandModal = true" class="flex items-center gap-2">
-                    <span class="material-symbols-outlined text-[18px]">add_business</span>
-                    Add Brand
-                </SecondaryButton>
-
-                <PrimaryButton v-if="activeTab === 'inventory'" @click="openAddModal" class="flex items-center gap-2">
-                    <span class="material-symbols-outlined text-[18px]">add</span>
+                <PrimaryButton v-if="activeTab === 'inventory'" @click="openAddModal" class="!bg-indigo-600 h-[46px] px-6 rounded-2xl shadow-lg shadow-indigo-100 flex items-center gap-2">
+                    <span class="material-symbols-outlined text-[18px]">add_circle</span>
                     Add Product
                 </PrimaryButton>
             </div>
@@ -419,10 +436,14 @@ const getBrandName = (id) => {
                                 </td>
                             </tr>
                             <tr v-if="filteredInventory.length === 0">
-                                <td colspan="7" class="py-20 text-center text-outline italic">No products found in this brand.</td>
+                                <td colspan="7" class="py-20 text-center text-outline italic">No products found.</td>
                             </tr>
                         </tbody>
                     </table>
+                </div>
+
+                <div class="p-4 border-t border-outline-variant/10">
+                    <Pagination :links="inventory.links" :meta="inventory" />
                 </div>
             </div>
         </div>
@@ -441,7 +462,7 @@ const getBrandName = (id) => {
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-outline-variant/10">
-                        <tr v-for="move in movements" :key="move.id" class="hover:bg-surface-container-low/30 transition-colors">
+                        <tr v-for="move in movements.data" :key="move.id" class="hover:bg-surface-container-low/30 transition-colors">
                             <td class="px-6 py-5 text-outline text-sm">{{ new Date(move.created_at).toLocaleString() }}</td>
                             <td class="px-6 py-5 font-bold">{{ move.inventory?.name || 'Unknown' }}</td>
                             <td class="px-6 py-5">
@@ -461,6 +482,10 @@ const getBrandName = (id) => {
                         </tr>
                     </tbody>
                 </table>
+            </div>
+            
+            <div class="p-4 border-t border-outline-variant/10">
+                <Pagination :links="movements.links" :meta="movements" />
             </div>
         </div>
 

@@ -11,8 +11,8 @@ class EmployeeController extends Controller
     public function index()
     {
         return Inertia::render('Employees', [
-            'employees' => Employee::all(['id', 'name']),
-            'customers' => \App\Models\Customer::all(['id', 'name']),
+            'employees' => Employee::latest()->paginate(15, ['*'], 'emp_page')->withQueryString(),
+            'customers' => \App\Models\Customer::latest()->paginate(15, ['*'], 'cust_page')->withQueryString(),
         ]);
     }
 
