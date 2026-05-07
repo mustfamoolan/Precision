@@ -76,6 +76,7 @@ Route::middleware('auth')->group(function () {
     // Bank System Routes
     Route::get('/banks', [\App\Http\Controllers\BankController::class, 'index'])->name('banks');
     Route::post('/banks', [\App\Http\Controllers\BankController::class, 'store']);
+    Route::put('/banks/{bank}', [\App\Http\Controllers\BankController::class, 'update']);
     Route::post('/banks/adjust', [\App\Http\Controllers\BankController::class, 'adjustBalance']);
     Route::post('/banks/expense', [\App\Http\Controllers\BankController::class, 'storeExpense']);
     Route::post('/cheques', [\App\Http\Controllers\ChequeController::class, 'store']);

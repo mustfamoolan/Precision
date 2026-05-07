@@ -289,9 +289,6 @@ const exportInvoicePDF = (sale) => {
 
         if (isTaxEnabled) {
             doc.text('TRN: ' + (sale.trn || '100267536900003'), 20, 92);
-        } else {
-            // If tax is disabled, only show the label without the number
-            doc.text('TRN:', 20, 92);
         }
 
         // Right: Invoice Meta
@@ -392,13 +389,8 @@ const exportInvoicePDF = (sale) => {
             currentY += 7;
             doc.text('VAT (5%)', totalX, currentY);
             doc.text(totalVat.toFixed(2), W - 25, currentY, { align: 'right' });
-        } else {
-            doc.text('Sub Total (Net)', totalX, currentY);
-            doc.text(subtotal.toFixed(2), W - 25, currentY, { align: 'right' });
             
             currentY += 7;
-            doc.text('VAT (5%)', totalX, currentY);
-            doc.text('0.00', W - 25, currentY, { align: 'right' });
         }
         currentY += 7;
 
@@ -757,40 +749,40 @@ const exportInvoicePDF = (sale) => {
                     </div>
                 </div>
 
-                <!-- Financial Summary Card -->
-                <div class="mt-8 p-6 bg-slate-900 rounded-[2rem] text-white shadow-xl shadow-slate-200 overflow-hidden relative group">
-                    <div class="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform duration-500">
-                        <span class="material-symbols-outlined text-8xl">payments</span>
+                <!-- Financial Summary Card (Light Theme) -->
+                <div class="mt-8 p-6 bg-slate-50 rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden relative group">
+                    <div class="absolute top-0 right-0 p-8 opacity-5 group-hover:scale-110 transition-transform duration-500">
+                        <span class="material-symbols-outlined text-8xl text-slate-900">payments</span>
                     </div>
                     
                     <div class="relative z-10 space-y-4">
                         <!-- Only show breakdown if tax is enabled -->
-                        <div v-if="form.has_tax" class="flex justify-between items-center border-b border-white/10 pb-4">
+                        <div v-if="form.has_tax" class="flex justify-between items-center border-b border-slate-200 pb-4">
                             <div>
-                                <p class="text-[10px] font-black text-white/50 uppercase tracking-widest">Subtotal (Net)</p>
-                                <p class="text-lg font-bold">{{ form.subtotal.toFixed(2) }} <span class="text-xs font-medium opacity-50">{{ form.currency }}</span></p>
-                                <p class="text-[8px] font-bold text-indigo-400 uppercase mt-1">TRN: {{ form.trn || '100267536900003' }}</p>
+                                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Subtotal (Net)</p>
+                                <p class="text-lg font-bold text-slate-900">{{ form.subtotal.toFixed(2) }} <span class="text-xs font-medium opacity-50">{{ form.currency }}</span></p>
+                                <p class="text-[8px] font-bold text-indigo-600 uppercase mt-1">TRN: {{ form.trn || '100267536900003' }}</p>
                             </div>
                             <div class="text-right">
-                                <p class="text-[10px] font-black text-white/50 uppercase tracking-widest">VAT (5%)</p>
-                                <p class="text-lg font-bold text-indigo-400">+ {{ form.vat.toFixed(2) }} <span class="text-xs font-medium opacity-50">{{ form.currency }}</span></p>
+                                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">VAT (5%)</p>
+                                <p class="text-lg font-bold text-indigo-600">+ {{ form.vat.toFixed(2) }} <span class="text-xs font-medium opacity-50">{{ form.currency }}</span></p>
                             </div>
                         </div>
                         
                         <div class="flex justify-between items-end">
                             <div>
-                                <p class="text-xs font-black text-white/50 uppercase tracking-widest mb-1">{{ form.has_tax ? 'Grand Total (Inc. VAT)' : 'Total Amount' }}</p>
-                                <p class="text-4xl font-black tracking-tighter" :class="form.has_tax ? 'text-white' : 'text-indigo-400'">
+                                <p class="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">{{ form.has_tax ? 'Grand Total (Inc. VAT)' : 'Total Amount' }}</p>
+                                <p class="text-4xl font-black tracking-tighter" :class="form.has_tax ? 'text-slate-900' : 'text-indigo-600'">
                                     {{ form.amount.toFixed(2) }} <span class="text-sm font-bold opacity-40">{{ form.currency }}</span>
                                 </p>
                             </div>
                             <div class="w-40">
-                                <FormField label="Paid Amount" :error="form.errors.paid_amount" label-class="text-white/50">
+                                <FormField label="Paid Amount" :error="form.errors.paid_amount" label-class="text-slate-500">
                                     <TextInput 
                                         v-model="form.paid_amount" 
                                         type="number" 
                                         step="0.01" 
-                                        class="!bg-white/10 !border-white/10 !text-white !placeholder-white/30" 
+                                        class="!bg-white !border-slate-200 !text-slate-900 !placeholder-slate-300" 
                                         placeholder="0.00" 
                                     />
                                 </FormField>
