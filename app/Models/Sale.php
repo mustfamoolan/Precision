@@ -32,7 +32,8 @@ class Sale extends Model
     ];
 
     protected $casts = [
-        'items' => 'array'
+        'items' => 'array',
+        'has_tax' => 'boolean'
     ];
 
     public function bank()

@@ -285,9 +285,12 @@ const exportInvoicePDF = (sale) => {
             doc.text('Al Ain, United Arab Emirates.', 20, 87);
         }
         
-        if (sale.has_tax) {
+        const isTaxEnabled = sale.has_tax === true || sale.has_tax === 1 || sale.has_tax === '1';
+
+        if (isTaxEnabled) {
             doc.text('TRN: ' + (sale.trn || '100267536900003'), 20, 92);
         } else {
+            // If tax is disabled, only show the label without the number
             doc.text('TRN:', 20, 92);
         }
 
@@ -382,7 +385,7 @@ const exportInvoicePDF = (sale) => {
         doc.setFontSize(9);
         doc.setFont('helvetica', 'normal');
         
-        if (sale.has_tax) {
+        if (isTaxEnabled) {
             doc.text('Sub Total (Net)', totalX, currentY);
             doc.text(subtotal.toFixed(2), W - 25, currentY, { align: 'right' });
             
