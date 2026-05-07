@@ -36,7 +36,8 @@ class ChequeController extends Controller
         $validated['status'] = 'pending';
         $validated['party_name'] = $validated['type'] === 'incoming' ? $validated['sender_name'] : $validated['receiver_name'];
 
-        Cheque::create($validated);
+        $cheque = Cheque::create($validated);
+        \App\Services\ActivityLogger::log('created', 'Registered new ' . $cheque->type . ' cheque: #' . $cheque->cheque_number . ' for ' . $cheque->amount, $cheque);
 
         return redirect()->back()->with('success', 'Cheque registered successfully.');
     }
@@ -73,6 +74,8 @@ class ChequeController extends Controller
                 'date' => now()->toDateString(),
             ]);
 
+            \App\Services\ActivityLogger::log('updated', 'Received cheque #' . $cheque->cheque_number . ' into ' . $bank->name, $cheque);
+
             return redirect()->back()->with('success', 'Cheque received into ' . $bank->name);
         });
     }
@@ -102,6 +105,8 @@ class ChequeController extends Controller
                 'date' => now()->toDateString(),
             ]);
 
+            \App\Services\ActivityLogger::log('updated', 'Cleared/Paid cheque #' . $cheque->cheque_number . ' from ' . $bank->name, $cheque);
+
             return redirect()->back()->with('success', 'Cheque cleared from ' . $bank->name);
         });
     }
@@ -124,7 +129,9 @@ class ChequeController extends Controller
      */
     public function destroy(Cheque $cheque)
     {
+        $num = $cheque->cheque_number;
         $cheque->delete();
+        \App\Services\ActivityLogger::log('deleted', 'Deleted cheque record: #' . $num);
         return redirect()->back()->with('success', 'Cheque record removed.');
     }
 }

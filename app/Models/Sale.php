@@ -25,7 +25,10 @@ class Sale extends Model
         'bank_id',
         'shipment_id',
         'items',
-        'customer_address'
+        'customer_address',
+        'has_tax',
+        'currency',
+        'trn'
     ];
 
     protected $casts = [

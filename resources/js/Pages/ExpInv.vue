@@ -50,10 +50,10 @@ const form = useForm({
     date: new Date().toISOString().substr(0, 10),
     invoice_number: '',
     customer_name: '',
-    amount: '',
+    amount: 0,
     type: 'export',
     items_count: 1,
-    paid_amount: '',
+    paid_amount: 0,
     container_number: '',
     shipping_status: 'On Board',
     bank_id: '',
@@ -61,6 +61,9 @@ const form = useForm({
     customer_address: '',
     subtotal: 0,
     vat: 0,
+    has_tax: true,
+    currency: 'AED',
+    trn: '100267536900003',
 });
 
 const paymentForm = useForm({
@@ -101,11 +104,14 @@ const openEditModal = (sale) => {
     form.bank_id = sale.bank_id || '';
     form.items = sale.items || [];
     form.customer_address = sale.customer_address || '';
+    form.has_tax = sale.has_tax !== undefined ? !!sale.has_tax : true;
+    form.currency = sale.currency || 'AED';
+    form.trn = sale.trn || '100267536900003';
     showAddModal.value = true;
 };
 
 const addItem = () => {
-    form.items.push({ inventory_id: '', name: '', quantity: 1, rate: 0 });
+    form.items.push({ inventory_id: '', name: '', quantity: 1, rate: 0, currency: form.currency || 'AED' });
 };
 
 const removeItem = (index) => {
@@ -142,6 +148,20 @@ const confirmDelete = (id) => {
         router.delete(`/sales/${id}`);
     }
 };
+
+// Auto-calculate Total Amount
+watch(() => [form.items, form.has_tax], () => {
+    let subtotal = form.items.reduce((acc, item) => acc + (parseFloat(item.quantity || 0) * parseFloat(item.rate || 0)), 0);
+    form.subtotal = subtotal;
+    
+    if (form.has_tax) {
+        form.vat = subtotal * 0.05;
+        form.amount = subtotal + form.vat;
+    } else {
+        form.vat = 0;
+        form.amount = subtotal;
+    }
+}, { deep: true });
 
 // Auto-fill address when customer is selected
 watch(() => form.customer_name, (newName) => {
@@ -264,7 +284,12 @@ const exportInvoicePDF = (sale) => {
         } else {
             doc.text('Al Ain, United Arab Emirates.', 20, 87);
         }
-        doc.text('TRN: 100267536900003', 20, 92);
+        
+        if (sale.has_tax) {
+            doc.text('TRN: ' + (sale.trn || '100267536900003'), 20, 92);
+        } else {
+            doc.text('TRN:', 20, 92);
+        }
 
         // Right: Invoice Meta
         const metaX = W - 80;
@@ -296,7 +321,9 @@ const exportInvoicePDF = (sale) => {
         doc.text('Description', 30, tableY + 5.5);
         doc.text('Qty', W - 85, tableY + 5.5, { align: 'right' });
         doc.text('Rate', W - 65, tableY + 5.5, { align: 'right' });
-        doc.text('VAT 5%', W - 45, tableY + 5.5, { align: 'right' });
+        if (sale.has_tax) {
+            doc.text('VAT 5%', W - 45, tableY + 5.5, { align: 'right' });
+        }
         doc.text('Amount', W - 25, tableY + 5.5, { align: 'right' });
 
         doc.setFont('helvetica', 'normal');
@@ -310,14 +337,18 @@ const exportInvoicePDF = (sale) => {
             doc.line(28, currentY, 28, currentY + rowHeight);
             doc.line(W - 95, currentY, W - 95, currentY + rowHeight);
             doc.line(W - 75, currentY, W - 75, currentY + rowHeight);
-            doc.line(W - 55, currentY, W - 55, currentY + rowHeight);
-            doc.line(W - 35, currentY, W - 35, currentY + rowHeight);
+            if (sale.has_tax) {
+                doc.line(W - 55, currentY, W - 55, currentY + rowHeight);
+                doc.line(W - 35, currentY, W - 35, currentY + rowHeight);
+            } else {
+                doc.line(W - 35, currentY, W - 35, currentY + rowHeight);
+            }
 
             if (item) {
                 const qty = parseFloat(item.quantity || 0);
                 const rate = parseFloat(item.rate || 0);
                 const lineTotal = qty * rate;
-                const lineVat = lineTotal * 0.05;
+                const lineVat = sale.has_tax ? (lineTotal * 0.05) : 0;
                 subtotal += lineTotal;
                 totalVat += lineVat;
 
@@ -332,8 +363,10 @@ const exportInvoicePDF = (sale) => {
 
                 doc.text(qty.toFixed(2), W - 77, currentY + 5.5, { align: 'right' });
                 doc.text(rate.toFixed(2), W - 57, currentY + 5.5, { align: 'right' });
-                doc.text(lineVat.toFixed(2), W - 37, currentY + 5.5, { align: 'right' });
-                doc.text((lineTotal + lineVat).toFixed(2), W - 22, currentY + 5.5, { align: 'right' });
+                if (sale.has_tax) {
+                    doc.text(lineVat.toFixed(2), W - 37, currentY + 5.5, { align: 'right' });
+                }
+                doc.text((sale.has_tax ? (lineTotal + lineVat) : lineTotal).toFixed(2), W - 22, currentY + 5.5, { align: 'right' });
             }
             currentY += rowHeight;
         }
@@ -347,23 +380,44 @@ const exportInvoicePDF = (sale) => {
         currentY += 5;
         const totalX = W - 70;
         doc.setFontSize(9);
-        doc.text('Sub Total (VAT)', totalX, currentY);
-        doc.text(totalVat.toFixed(2), W - 25, currentY, { align: 'right' });
+        doc.setFont('helvetica', 'normal');
         
+        if (sale.has_tax) {
+            doc.text('Sub Total (Net)', totalX, currentY);
+            doc.text(subtotal.toFixed(2), W - 25, currentY, { align: 'right' });
+            
+            currentY += 7;
+            doc.text('VAT (5%)', totalX, currentY);
+            doc.text(totalVat.toFixed(2), W - 25, currentY, { align: 'right' });
+        } else {
+            doc.text('Sub Total (Net)', totalX, currentY);
+            doc.text(subtotal.toFixed(2), W - 25, currentY, { align: 'right' });
+            
+            currentY += 7;
+            doc.text('VAT (5%)', totalX, currentY);
+            doc.text('0.00', W - 25, currentY, { align: 'right' });
+        }
         currentY += 7;
-        doc.text('Total Taxable Amount', totalX, currentY);
-        doc.text(subtotal.toFixed(2), W - 25, currentY, { align: 'right' });
-        
-        currentY += 7;
+
         doc.setFont('helvetica', 'bold');
-        doc.text('Total', totalX, currentY);
-        doc.text(`AED ${(subtotal + totalVat).toFixed(2)}`, W - 25, currentY, { align: 'right' });
+        doc.text('Grand Total', totalX, currentY);
+        const finalTotal = sale.has_tax ? (subtotal + totalVat) : subtotal;
+        doc.text(`${sale.currency || 'AED'} ${finalTotal.toFixed(2)}`, W - 25, currentY, { align: 'right' });
         
+        currentY += 7;
+        doc.setFont('helvetica', 'normal');
+        doc.text('Paid Amount', totalX, currentY);
+        doc.text(`${sale.currency || 'AED'} ${parseFloat(sale.paid_amount || 0).toFixed(2)}`, W - 25, currentY, { align: 'right' });
+
         currentY += 7;
         doc.setDrawColor(200, 200, 200);
         doc.line(totalX, currentY - 2, W - 20, currentY - 2);
+        
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(225, 29, 72); // Rose-600 color for balance
         doc.text('Balance Due', totalX, currentY + 3);
-        doc.text(`AED ${parseFloat(sale.due_amount).toFixed(2)}`, W - 25, currentY + 3, { align: 'right' });
+        doc.text(`${sale.currency || 'AED'} ${parseFloat(sale.due_amount || 0).toFixed(2)}`, W - 25, currentY + 3, { align: 'right' });
+        doc.setTextColor(30, 41, 59); // Reset color
 
         // Footer Section
         const footerY = H - 60;
@@ -626,20 +680,31 @@ const exportInvoicePDF = (sale) => {
                 </FormField>
 
                 <div class="grid grid-cols-2 gap-4">
+                    <div class="flex items-center gap-4">
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" v-model="form.has_tax" class="sr-only peer">
+                            <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                            <span class="ml-3 text-sm font-black text-slate-700 uppercase tracking-widest">Enable 5% VAT</span>
+                        </label>
+                    </div>
+                    
+                    <FormField label="Invoice Currency" :error="form.errors.currency">
+                        <SelectInput v-model="form.currency" :options="[{label: 'AED - UAE Dirham', value: 'AED'}, {label: 'USD - US Dollar', value: 'USD'}, {label: 'IQD - Iraqi Dinar', value: 'IQD'}]" />
+                    </FormField>
+                </div>
+
+                <div v-if="form.has_tax" class="animate-in fade-in slide-in-from-top duration-300">
+                    <FormField label="Tax Registration Number (TRN)" :error="form.errors.trn">
+                        <TextInput v-model="form.trn" placeholder="100267536900003" />
+                    </FormField>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
                     <FormField label="Container / Shipment # (Optional)" :error="form.errors.container_number">
                         <TextInput v-model="form.container_number" prefix="CN-" placeholder="123456" />
                     </FormField>
                     <FormField label="Shipping Status" :error="form.errors.shipping_status" required>
                         <SelectInput v-model="form.shipping_status" :options="shippingStatuses.map(s => ({label: s, value: s}))" />
-                    </FormField>
-                </div>
-
-                <div class="grid grid-cols-2 gap-4">
-                    <FormField label="Total Amount (AED)" :error="form.errors.amount" required>
-                        <TextInput v-model="form.amount" type="number" step="0.01" prefix="AED" placeholder="0.00" />
-                    </FormField>
-                    <FormField label="Paid Amount (AED)" :error="form.errors.paid_amount">
-                        <TextInput v-model="form.paid_amount" type="number" step="0.01" prefix="AED" placeholder="0.00" />
                     </FormField>
                 </div>
 
@@ -650,17 +715,6 @@ const exportInvoicePDF = (sale) => {
                     />
                 </FormField>
 
-                <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex justify-between">
-                    <div>
-                        <p class="text-[10px] font-black text-slate-400 uppercase">Calculated Total (Inc. 5% VAT)</p>
-                        <p class="text-xl font-black text-slate-900">{{ formatCurrency(form.items.reduce((acc, i) => acc + (i.quantity * i.rate * 1.05), 0)) }}</p>
-                    </div>
-                    <div class="text-right">
-                        <p class="text-[10px] font-black text-slate-400 uppercase">Subtotal</p>
-                        <p class="text-sm font-bold text-slate-600">{{ formatCurrency(form.items.reduce((acc, i) => acc + (i.quantity * i.rate), 0)) }}</p>
-                    </div>
-                </div>
-
                 <!-- Items Section -->
                 <div class="border-t border-slate-100 pt-5 mt-5">
                     <div class="flex justify-between items-center mb-4">
@@ -669,14 +723,14 @@ const exportInvoicePDF = (sale) => {
                     </div>
 
                     <div class="space-y-3">
-                        <div v-for="(item, index) in form.items" :key="index" class="flex flex-wrap gap-3 items-end bg-slate-50 p-3 rounded-xl border border-slate-100">
-                            <div class="flex-1 min-w-[150px]">
+                        <div v-for="(item, index) in form.items" :key="index" class="flex flex-wrap gap-3 items-end bg-slate-50 p-4 rounded-2xl border border-slate-100 shadow-sm">
+                            <div class="flex-1 min-w-[200px]">
                                 <label class="text-[9px] font-black text-slate-400 uppercase mb-1 block">Product</label>
                                 <SelectInput 
                                     v-model="item.inventory_id" 
                                     :options="inventory.map(i => ({ label: `${i.name} (${i.sku})`, value: i.id }))"
                                     @update:modelValue="(val) => onInventorySelect(index, val)"
-                                    placeholder="Choose..."
+                                    placeholder="Choose Product..."
                                 />
                             </div>
                             <div class="w-16">
@@ -689,13 +743,56 @@ const exportInvoicePDF = (sale) => {
                             </div>
                             <div class="w-20 text-right pr-2">
                                 <label class="text-[9px] font-black text-slate-400 uppercase mb-1 block">Total</label>
-                                <p class="text-xs font-bold py-2">{{ formatCurrency(item.quantity * item.rate).replace('AED', '') }}</p>
+                                <p class="text-xs font-black py-2 text-slate-900">{{ (item.quantity * item.rate).toFixed(2) }}</p>
+                                <p v-if="form.has_tax" class="text-[8px] font-bold text-indigo-500 uppercase tracking-tighter mt-1">+5% VAT</p>
                             </div>
-                            <button type="button" @click="removeItem(index)" class="mb-2 text-rose-500 hover:text-rose-700">
+                            <button type="button" @click="removeItem(index)" class="mb-2 w-8 h-8 rounded-lg flex items-center justify-center text-rose-500 hover:bg-rose-50 transition-colors">
                                 <span class="material-symbols-outlined text-[20px]">delete</span>
                             </button>
                         </div>
-                        <div v-if="form.items.length === 0" class="text-center py-4 text-[10px] text-slate-400 italic">No items added. Click + Add Item to include warehouse stock on the invoice.</div>
+                        <div v-if="form.items.length === 0" class="text-center py-6 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200 text-[10px] text-slate-400 font-bold uppercase tracking-widest">No items added. Click + Add Item.</div>
+                    </div>
+                </div>
+
+                <!-- Financial Summary Card -->
+                <div class="mt-8 p-6 bg-slate-900 rounded-[2rem] text-white shadow-xl shadow-slate-200 overflow-hidden relative group">
+                    <div class="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform duration-500">
+                        <span class="material-symbols-outlined text-8xl">payments</span>
+                    </div>
+                    
+                    <div class="relative z-10 space-y-4">
+                        <!-- Only show breakdown if tax is enabled -->
+                        <div v-if="form.has_tax" class="flex justify-between items-center border-b border-white/10 pb-4">
+                            <div>
+                                <p class="text-[10px] font-black text-white/50 uppercase tracking-widest">Subtotal (Net)</p>
+                                <p class="text-lg font-bold">{{ form.subtotal.toFixed(2) }} <span class="text-xs font-medium opacity-50">{{ form.currency }}</span></p>
+                                <p class="text-[8px] font-bold text-indigo-400 uppercase mt-1">TRN: {{ form.trn || '100267536900003' }}</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-[10px] font-black text-white/50 uppercase tracking-widest">VAT (5%)</p>
+                                <p class="text-lg font-bold text-indigo-400">+ {{ form.vat.toFixed(2) }} <span class="text-xs font-medium opacity-50">{{ form.currency }}</span></p>
+                            </div>
+                        </div>
+                        
+                        <div class="flex justify-between items-end">
+                            <div>
+                                <p class="text-xs font-black text-white/50 uppercase tracking-widest mb-1">{{ form.has_tax ? 'Grand Total (Inc. VAT)' : 'Total Amount' }}</p>
+                                <p class="text-4xl font-black tracking-tighter" :class="form.has_tax ? 'text-white' : 'text-indigo-400'">
+                                    {{ form.amount.toFixed(2) }} <span class="text-sm font-bold opacity-40">{{ form.currency }}</span>
+                                </p>
+                            </div>
+                            <div class="w-40">
+                                <FormField label="Paid Amount" :error="form.errors.paid_amount" label-class="text-white/50">
+                                    <TextInput 
+                                        v-model="form.paid_amount" 
+                                        type="number" 
+                                        step="0.01" 
+                                        class="!bg-white/10 !border-white/10 !text-white !placeholder-white/30" 
+                                        placeholder="0.00" 
+                                    />
+                                </FormField>
+                            </div>
+                        </div>
                     </div>
                 </div>
 

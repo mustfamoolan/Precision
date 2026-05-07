@@ -102,6 +102,8 @@ class ShippingToolController extends Controller
         Sale::where('container_number', $shipment->container_number)
             ->update(['shipment_id' => $shipment->id]);
 
+        \App\Services\ActivityLogger::log('created', 'Created shipment: ' . $shipment->container_number, $shipment);
+
         return redirect()->route('shipping.show', $shipment->id)->with('success', 'Shipment created successfully.');
     }
 
@@ -130,12 +132,16 @@ class ShippingToolController extends Controller
         Sale::where('container_number', $shipment->container_number)
             ->update(['shipment_id' => $shipment->id]);
 
+        \App\Services\ActivityLogger::log('updated', 'Updated shipment info: ' . $shipment->container_number, $shipment);
+
         return redirect()->back()->with('success', 'Shipment updated successfully.');
     }
 
     public function destroy(Shipment $shipment)
     {
+        $container = $shipment->container_number;
         $shipment->delete();
+        \App\Services\ActivityLogger::log('deleted', 'Deleted shipment: ' . $container);
         return redirect()->route('shipping')->with('success', 'Shipment deleted.');
     }
 
@@ -149,14 +155,18 @@ class ShippingToolController extends Controller
             'currency'     => 'nullable|string|max:10',
         ]);
 
-        $shipment->items()->create($validated);
+        $item = $shipment->items()->create($validated);
+        \App\Services\ActivityLogger::log('created', 'Added item ' . $item->product_name . ' to shipment ' . $shipment->container_number, $shipment);
 
         return redirect()->back()->with('success', 'Item added to packing list.');
     }
 
     public function deleteItem(ShipmentItem $item)
     {
+        $name = $item->product_name;
+        $container = $item->shipment->container_number;
         $item->delete();
+        \App\Services\ActivityLogger::log('deleted', 'Removed item ' . $name . ' from shipment ' . $container);
         return redirect()->back()->with('success', 'Item removed.');
     }
 
@@ -169,10 +179,12 @@ class ShippingToolController extends Controller
             'note'           => 'nullable|string',
         ]);
 
-        $shipment->payments()->create($validated);
+        $payment = $shipment->payments()->create($validated);
         
         // Update paid_amount in shipment
         $shipment->increment('paid_amount', $validated['amount']);
+
+        \App\Services\ActivityLogger::log('created', 'Recorded payment of ' . $validated['amount'] . ' for shipment ' . $shipment->container_number, $shipment);
 
         return redirect()->back()->with('success', 'Payment recorded.');
     }
@@ -180,8 +192,14 @@ class ShippingToolController extends Controller
     public function deletePayment(ShipmentPayment $payment)
     {
         $shipment = $payment->shipment;
+        $amount = $payment->amount;
+        $container = $shipment->container_number;
+
         $shipment->decrement('paid_amount', $payment->amount);
         $payment->delete();
+
+        \App\Services\ActivityLogger::log('deleted', 'Removed payment of ' . $amount . ' from shipment ' . $container);
+
         return redirect()->back()->with('success', 'Payment removed.');
     }
 }

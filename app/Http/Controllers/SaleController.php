@@ -72,7 +72,7 @@ class SaleController extends Controller
             ]),
             'banks' => Bank::all(['id', 'name']),
             'customers' => \App\Models\Customer::orderBy('name')->get(['id', 'name', 'address']),
-            'inventory' => \App\Models\Inventory::all(['id', 'name', 'sku']),
+            'inventory' => \App\Models\Inventory::all(['id', 'name', 'sku', 'selling_price']),
         ]);
     }
 
@@ -91,6 +91,9 @@ class SaleController extends Controller
             'bank_id' => 'nullable|exists:banks,id',
             'items' => 'nullable|array',
             'customer_address' => 'nullable|string|max:500',
+            'has_tax' => 'nullable|boolean',
+            'currency' => 'nullable|string',
+            'trn' => 'nullable|string',
 
         ]);
 
@@ -153,6 +156,8 @@ class SaleController extends Controller
             }
         }
 
+        \App\Services\ActivityLogger::log('created', 'Created new ' . $sale->type . ' sale: ' . $sale->invoice_number . ' for ' . $sale->customer_name, $sale);
+
         return redirect()->back();
     }
 
@@ -171,6 +176,9 @@ class SaleController extends Controller
             'bank_id' => 'nullable|exists:banks,id',
             'items' => 'nullable|array',
             'customer_address' => 'nullable|string|max:500',
+            'has_tax' => 'nullable|boolean',
+            'currency' => 'nullable|string',
+            'trn' => 'nullable|string',
 
         ]);
 
@@ -204,6 +212,8 @@ class SaleController extends Controller
         \App\Models\Sale::withoutEvents(function () use ($sale, $validated) {
             $sale->update($validated);
         });
+
+        \App\Services\ActivityLogger::log('updated', 'Updated ' . $sale->type . ' sale: ' . $sale->invoice_number, $sale);
 
         return redirect()->back();
     }
@@ -244,12 +254,16 @@ class SaleController extends Controller
             $sale->save();
         });
 
+        \App\Services\ActivityLogger::log('updated', 'Recorded payment of ' . $request->payment_amount . ' for sale: ' . $sale->invoice_number, $sale);
+
         return redirect()->back();
     }
 
     public function destroy(Sale $sale)
     {
+        $inv = $sale->invoice_number;
         $sale->delete();
+        \App\Services\ActivityLogger::log('deleted', 'Deleted sale: ' . $inv);
         return redirect()->back();
     }
 }

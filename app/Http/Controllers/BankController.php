@@ -76,6 +76,8 @@ class BankController extends Controller
                 ]);
             }
 
+            \App\Services\ActivityLogger::log('created', 'Created bank account: ' . $bank->name . ' with balance ' . $validated['balance'], $bank);
+
             return redirect()->back()->with('success', 'Bank account added with opening balance.');
         });
     }
@@ -117,6 +119,8 @@ class BankController extends Controller
                 $bank->decrement('balance', $validated['amount']);
             }
 
+            \App\Services\ActivityLogger::log('updated', 'Adjusted ' . $bank->name . ' balance: ' . $validated['type'] . ' of ' . $validated['amount'], $bank);
+
             return redirect()->back()->with('success', 'Balance adjusted successfully.');
         });
     }
@@ -132,6 +136,7 @@ class BankController extends Controller
         ]);
 
         $bank->update($validated);
+        \App\Services\ActivityLogger::log('updated', 'Updated bank information for: ' . $bank->name, $bank);
         return redirect()->back()->with('success', 'Bank information updated.');
     }
 
@@ -155,7 +160,7 @@ class BankController extends Controller
                 return redirect()->back()->withErrors(['amount' => 'Insufficient bank balance.']);
             }
 
-            Expense::create([
+            $expense = Expense::create([
                 'date' => $validated['date'],
                 'description' => $validated['description'],
                 'amount' => $validated['amount'],
@@ -175,6 +180,8 @@ class BankController extends Controller
 
             $bank->decrement('balance', $validated['amount']);
 
+            \App\Services\ActivityLogger::log('created', 'Recorded bank expense: ' . $validated['description'] . ' (' . $validated['amount'] . ') from ' . $bank->name, $expense);
+
             return redirect()->back()->with('success', 'Bank expense recorded.');
         });
     }
@@ -184,7 +191,9 @@ class BankController extends Controller
      */
     public function destroy(Bank $bank)
     {
+        $name = $bank->name;
         $bank->delete();
+        \App\Services\ActivityLogger::log('deleted', 'Deleted bank account: ' . $name);
         return redirect()->back()->with('success', 'Bank account removed.');
     }
 }

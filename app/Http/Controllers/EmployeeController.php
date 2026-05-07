@@ -22,7 +22,8 @@ class EmployeeController extends Controller
             'name' => 'required|string|max:255',
         ]);
 
-        Employee::create($validated);
+        $employee = Employee::create($validated);
+        \App\Services\ActivityLogger::log('created', 'Added new employee: ' . $employee->name, $employee);
 
         return redirect()->back();
     }
@@ -34,13 +35,16 @@ class EmployeeController extends Controller
         ]);
 
         $employee->update($validated);
+        \App\Services\ActivityLogger::log('updated', 'Updated employee info: ' . $employee->name, $employee);
 
         return redirect()->back();
     }
 
     public function destroy(Employee $employee)
     {
+        $name = $employee->name;
         $employee->delete();
+        \App\Services\ActivityLogger::log('deleted', 'Deleted employee: ' . $name);
 
         return redirect()->back();
     }

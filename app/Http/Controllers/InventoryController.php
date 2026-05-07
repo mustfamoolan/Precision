@@ -82,6 +82,8 @@ class InventoryController extends Controller
                 $this->logMovement($item->id, $item->remote_quantity, 'in', null, 'remote', 'Initial Stock');
             }
 
+            \App\Services\ActivityLogger::log('created', 'Added new product to inventory: ' . $item->name, $item);
+
             return redirect()->back()->with('success', 'Product added successfully.');
         });
     }
@@ -104,6 +106,7 @@ class InventoryController extends Controller
         ]);
 
         $inventory->update($validated);
+        \App\Services\ActivityLogger::log('updated', 'Updated inventory details for: ' . $inventory->name, $inventory);
 
         return redirect()->back()->with('success', 'Inventory updated.');
     }
@@ -117,7 +120,8 @@ class InventoryController extends Controller
             'name' => 'required|string|max:255|unique:brands,name',
         ]);
 
-        Brand::create($validated);
+        $brand = Brand::create($validated);
+        \App\Services\ActivityLogger::log('created', 'Created new brand: ' . $brand->name, $brand);
 
         return redirect()->back()->with('success', 'Brand added successfully.');
     }
@@ -154,6 +158,8 @@ class InventoryController extends Controller
                 'customer', 
                 ($validated['notes'] ?? 'Deduction for customer') . ": " . $customer->name
             );
+
+            \App\Services\ActivityLogger::log('updated', 'Deducted ' . $validated['quantity'] . ' of ' . $inventory->name . ' for customer ' . $customer->name, $inventory);
 
             return redirect()->back()->with('success', 'Stock deducted successfully.');
         });
@@ -196,6 +202,8 @@ class InventoryController extends Controller
                 $validated['notes'] ?? 'Manual Transfer'
             );
 
+            \App\Services\ActivityLogger::log('updated', 'Transferred ' . $validated['quantity'] . ' of ' . $inventory->name . ' from ' . $validated['from'] . ' to ' . $validated['to'], $inventory);
+
             return redirect()->back()->with('success', 'Stock transferred successfully.');
         });
     }
@@ -234,6 +242,8 @@ class InventoryController extends Controller
                 $validated['notes'] ?? 'Manual Adjustment'
             );
 
+            \App\Services\ActivityLogger::log('updated', 'Manual stock adjustment for ' . $inventory->name . ': ' . $validated['type'] . ' ' . $validated['quantity'] . ' units at ' . $validated['location'], $inventory);
+
             return redirect()->back()->with('success', 'Stock adjusted successfully.');
         });
     }
@@ -269,7 +279,9 @@ class InventoryController extends Controller
      */
     public function destroy(Inventory $inventory)
     {
+        $name = $inventory->name;
         $inventory->delete();
+        \App\Services\ActivityLogger::log('deleted', 'Removed product from inventory: ' . $name);
         return redirect()->back()->with('success', 'Product removed.');
     }
 }

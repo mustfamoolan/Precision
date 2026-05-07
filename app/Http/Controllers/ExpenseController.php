@@ -91,14 +91,17 @@ class ExpenseController extends Controller
             $validated['expense_number'] = $nextId;
         }
 
-        Expense::create($validated);
+        $expense = Expense::create($validated);
+        \App\Services\ActivityLogger::log('created', 'Recorded new expense: ' . $expense->description . ' (' . $expense->amount . ')', $expense);
 
         return redirect()->back();
     }
 
     public function destroy(Expense $expense)
     {
+        $desc = $expense->description;
         $expense->delete();
+        \App\Services\ActivityLogger::log('deleted', 'Deleted expense: ' . $desc);
         return redirect()->back();
     }
 }

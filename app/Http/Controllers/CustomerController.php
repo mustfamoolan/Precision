@@ -14,7 +14,8 @@ class CustomerController extends Controller
             'address' => 'nullable|string|max:500',
         ]);
 
-        Customer::create($validated);
+        $customer = Customer::create($validated);
+        \App\Services\ActivityLogger::log('created', 'Added new customer: ' . $customer->name, $customer);
 
         return redirect()->back();
     }
@@ -27,13 +28,16 @@ class CustomerController extends Controller
         ]);
 
         $customer->update($validated);
+        \App\Services\ActivityLogger::log('updated', 'Updated customer info: ' . $customer->name, $customer);
 
         return redirect()->back();
     }
 
     public function destroy(Customer $customer)
     {
+        $name = $customer->name;
         $customer->delete();
+        \App\Services\ActivityLogger::log('deleted', 'Deleted customer: ' . $name);
 
         return redirect()->back();
     }

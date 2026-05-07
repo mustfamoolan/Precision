@@ -82,4 +82,6 @@ Route::middleware('auth')->group(function () {
     Route::post('/cheques/{cheque}/receive', [\App\Http\Controllers\ChequeController::class, 'receive']);
     Route::post('/cheques/{cheque}/clear', [\App\Http\Controllers\ChequeController::class, 'clear']);
     Route::delete('/cheques/{cheque}', [\App\Http\Controllers\ChequeController::class, 'destroy']);
+
+    Route::get('/activity-log', [\App\Http\Controllers\ActivityLogController::class, 'index'])->name('activity-log');
 });
