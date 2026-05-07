@@ -32,9 +32,7 @@ const isExpenseModalOpen = ref(false);
 const isReceiveModalOpen = ref(false);
 const isAdjustmentModalOpen = ref(false);
 const isAddBankModalOpen = ref(false);
-const isEditBankModalOpen = ref(false);
 const selectedCheque = ref(null);
-const selectedBank = ref(null);
 
 // Filters
 const bankFilter = ref(props.filters?.bank || 'all');
@@ -99,15 +97,7 @@ const openAdjustmentModal = (bank = null) => {
 
 const openAddBankModal = () => {
     bankForm.reset();
-    selectedBank.value = null;
     isAddBankModalOpen.value = true;
-};
-
-const openEditBankModal = (bank) => {
-    selectedBank.value = bank;
-    bankForm.name = bank.name;
-    bankForm.balance = bank.balance;
-    isEditBankModalOpen.value = true;
 };
 
 const submitAdjustment = () => {
@@ -119,20 +109,11 @@ const submitAdjustment = () => {
 };
 
 const submitBank = () => {
-    if (selectedBank.value) {
-        bankForm.put(`/banks/${selectedBank.value.id}`, {
-            onSuccess: () => {
-                isEditBankModalOpen.value = false;
-                selectedBank.value = null;
-            }
-        });
-    } else {
-        bankForm.post('/banks', {
-            onSuccess: () => {
-                isAddBankModalOpen.value = false;
-            }
-        });
-    }
+    bankForm.post('/banks', {
+        onSuccess: () => {
+            isAddBankModalOpen.value = false;
+        }
+    });
 };
 
 const submitCheque = () => chequeForm.post('/cheques', { onSuccess: () => isChequeModalOpen.value = false });
@@ -187,9 +168,6 @@ const formatPrice = (amount) => new Intl.NumberFormat('en-AE', { style: 'currenc
                             <span class="material-symbols-outlined text-3xl">{{ bank.name.toLowerCase().includes('cash') ? 'payments' : 'account_balance' }}</span>
                         </div>
                         <div class="flex gap-2">
-                            <button @click="openEditBankModal(bank)" class="w-8 h-8 rounded-lg bg-white border border-slate-100 flex items-center justify-center text-slate-400 hover:text-amber-600 hover:border-amber-100 transition-all shadow-sm" title="Edit Bank Details">
-                                <span class="material-symbols-outlined text-[18px]">edit</span>
-                            </button>
                             <button @click="openAdjustmentModal(bank)" class="w-8 h-8 rounded-lg bg-white border border-slate-100 flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:border-indigo-100 transition-all shadow-sm" title="Add/Subtract Balance">
                                 <span class="material-symbols-outlined text-[18px]">add_circle</span>
                             </button>
@@ -410,22 +388,19 @@ const formatPrice = (amount) => new Intl.NumberFormat('en-AE', { style: 'currenc
             </form>
         </SideModal>
 
-        <!-- Add/Edit Bank Modal -->
-        <SideModal :show="isAddBankModalOpen || isEditBankModalOpen" :title="selectedBank ? 'Edit Account Details' : 'Register New Account'" @close="isAddBankModalOpen = isEditBankModalOpen = false">
+        <!-- Add Bank Modal -->
+        <SideModal :show="isAddBankModalOpen" title="Register New Account" @close="isAddBankModalOpen = false">
             <form @submit.prevent="submitBank" class="space-y-6 p-2">
                 <FormField label="Account / Bank Name" required :error="bankForm.errors.name">
                     <TextInput v-model="bankForm.name" placeholder="e.g. Emirates NBD, Office Safe" />
                 </FormField>
-                <FormField label="Balance (AED)" required :error="bankForm.errors.balance">
+                <FormField label="Initial / Opening Balance (AED)" required :error="bankForm.errors.balance">
                     <TextInput v-model="bankForm.balance" type="number" step="0.01" />
-                    <p class="mt-1 text-[10px] text-slate-400 font-bold uppercase" v-if="selectedBank">Warning: Changing this manually will skip transaction logs.</p>
                 </FormField>
 
                 <div class="pt-6 flex justify-end gap-3 border-t">
-                    <SecondaryButton @click="isAddBankModalOpen = isEditBankModalOpen = false" type="button">Cancel</SecondaryButton>
-                    <PrimaryButton :loading="bankForm.processing">
-                        {{ selectedBank ? 'Save Changes' : 'Create Account' }}
-                    </PrimaryButton>
+                    <SecondaryButton @click="isAddBankModalOpen = false" type="button">Cancel</SecondaryButton>
+                    <PrimaryButton :loading="bankForm.processing">Create Account</PrimaryButton>
                 </div>
             </form>
         </SideModal>
