@@ -178,9 +178,9 @@ const formatPrice = (amount) => new Intl.NumberFormat('en-AE', { style: 'currenc
         </div>
 
         <!-- Accounts Overview -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 mb-12">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
             <!-- Bank Cards -->
-            <div v-for="bank in banks" :key="bank.id" class="group relative overflow-hidden bg-white/70 backdrop-blur-xl rounded-[2.5rem] p-8 border border-white shadow-xl shadow-slate-200/50 transition-all hover:-translate-y-1 hover:shadow-2xl">
+            <div v-for="bank in banks" :key="bank.id" class="group relative overflow-hidden bg-white/70 backdrop-blur-xl rounded-[2.5rem] p-10 border border-white shadow-xl shadow-slate-200/50 transition-all hover:-translate-y-1 hover:shadow-2xl">
                 <div class="relative z-10 flex flex-col h-full">
                     <div class="flex items-center justify-between mb-8">
                         <div class="w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner" :class="bank.name.toLowerCase().includes('cash') ? 'bg-emerald-50 text-emerald-600' : 'bg-indigo-50 text-indigo-600'">
