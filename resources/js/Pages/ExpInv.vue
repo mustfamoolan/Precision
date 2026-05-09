@@ -213,20 +213,31 @@ const formatCurrency = (value) => {
 const shippingStatuses = ['On Board', 'In Transit', 'Delivered'];
 const statuses = [{label: 'All Status', value: 'all'}, {label: 'Paid', value: 'paid'}, {label: 'Partial', value: 'partial'}, {label: 'Pending', value: 'pending'}];
 
-const exportInvoicePDF = (sale) => {
+const exportInvoicePDF = async (sale) => {
+    const loadImg = (src) => new Promise((resolve) => {
+        const img = new Image();
+        img.src = src;
+        img.onload = () => resolve(img);
+        img.onerror = () => resolve(null);
+    });
+
+    const [logoImg, watermarkImg] = await Promise.all([
+        loadImg('/assets/images/logo.png'),
+        loadImg('/assets/images/logoblack.png')
+    ]);
+
     const doc = new jsPDF();
     const W = doc.internal.pageSize.getWidth();
     const H = doc.internal.pageSize.getHeight();
     
-    const renderArabic = (text, x, y, size, color = '#1e293b', align = 'left') => {
+    const renderArabic = (text, x, y, size, color = '#1e293b', align = 'left', isBold = true) => {
         if (!text) return;
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
         
-        // Scale for high resolution
         const scale = 8; 
         const fontSizePx = size * scale;
-        ctx.font = `bold ${fontSizePx}px Arial, sans-serif`;
+        ctx.font = `${isBold ? 'bold' : 'normal'} ${fontSizePx}px Arial, sans-serif`;
         
         const metrics = ctx.measureText(text);
         const textWidth = metrics.width;
@@ -234,197 +245,332 @@ const exportInvoicePDF = (sale) => {
         canvas.width = textWidth + (10 * scale);
         canvas.height = fontSizePx * 2;
         
-        // Re-set font after resizing canvas
         ctx.fillStyle = color;
-        ctx.font = `bold ${fontSizePx}px Arial, sans-serif`;
+        ctx.font = `${isBold ? 'bold' : 'normal'} ${fontSizePx}px Arial, sans-serif`;
         ctx.textBaseline = 'middle';
         ctx.fillText(text, 0, canvas.height / 2);
         
         const imgData = canvas.toDataURL('image/png');
-        
-        // Convert Pixels to MM (approx 1mm = 3.78px at 96dpi, but jsPDF uses 72dpi/pts)
-        // A better way: the height in mm should be approx size * 0.3527
-        const h = size * 0.45; // Adjusted height in mm
+        const h = size * 0.45; 
         const w = (textWidth / fontSizePx) * h;
         
         const finalX = align === 'right' ? (x - w) : x;
         doc.addImage(imgData, 'PNG', finalX, y - (h / 2), w, h);
     };
 
-    const img = new Image();
-    img.src = '/assets/images/invoice.png';
+    // Colors
+    const colorOrange = [234, 88, 12];
+    const colorDark = [30, 41, 59];
+    const colorGray = [100, 116, 139];
+    const colorLightGray = [148, 163, 184];
+    const colorBorder = [226, 232, 240];
+
+    // Helper functions for colors
+    const setTextColor = (color) => doc.setTextColor(color[0], color[1], color[2]);
+    const setDrawColor = (color) => doc.setDrawColor(color[0], color[1], color[2]);
+
+    const isTaxEnabled = sale.has_tax === true || sale.has_tax === 1 || sale.has_tax === '1';
+
+    // 1. Top Header (Outside Box)
+    // Left: Company Info
+    let logoW = 0;
+    if (logoImg) {
+        let h = 16;
+        let w = 16;
+        if (logoImg.width && logoImg.height) {
+            w = h * (logoImg.width / logoImg.height);
+        }
+        logoW = w;
+        doc.addImage(logoImg, 'PNG', 15, 17, w, h);
+    }
+    const leftTextX = logoImg ? 15 + logoW + 4 : 15;
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(20);
+    setTextColor(colorOrange);
+    doc.text('AL SHAMLY TRADING', leftTextX, 20);
     
-    img.onload = () => {
-        doc.addImage(img, 'PNG', 0, 0, W, H);
-        doc.setTextColor(30, 41, 59);
-        
-        // --- Header Section ---
-        // Left: Bill To
-        doc.setFontSize(9);
-        doc.setFont('helvetica', 'bold');
-        doc.text('Bill To', 20, 75);
-        
-        doc.setFontSize(11);
-        const hasArabic = /[\u0600-\u06FF]/.test(sale.customer_name);
-        if (hasArabic) {
-            renderArabic(sale.customer_name, 20, 82, 12);
-        } else {
-            doc.text(sale.customer_name || 'Walking Customer', 20, 82);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    setTextColor(colorGray);
+    doc.text('www.alshamly.ae', leftTextX, 26);
+    doc.text('INQUIRY@ALSHAMLY.AE', leftTextX, 31);
+    doc.text('04 2286 643', leftTextX, 36);
+
+    // Right: Business Address
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    setTextColor(colorGray);
+    doc.text('P.O BOX 261831 JEBEL ALI DUBAI', W - 15, 25, { align: 'right' });
+    doc.text('U.A.E', W - 15, 31, { align: 'right' });
+    if (isTaxEnabled) {
+        doc.text('TRN: ' + (sale.trn || '100267536900003'), W - 15, 36, { align: 'right' });
+    }
+
+    // 2. The Big Rounded Box
+    const boxY = 45;
+    const boxH = H - 75; // ends at H - 30
+    setDrawColor(colorBorder);
+    doc.setLineWidth(0.5);
+    doc.roundedRect(15, boxY, W - 30, boxH, 3, 3, 'S');
+
+    // Watermark
+    if (watermarkImg) {
+        let wmH = 130;
+        let wmW = 130;
+        if (watermarkImg.width && watermarkImg.height) {
+            wmW = wmH * (watermarkImg.width / watermarkImg.height);
         }
-        
+        try {
+            doc.setGState(new doc.GState({opacity: 0.3}));
+        } catch (e) {}
+        doc.addImage(watermarkImg, 'PNG', (W - wmW) / 2, (H - wmH) / 2, wmW, wmH);
+        try {
+            doc.setGState(new doc.GState({opacity: 1.0}));
+        } catch (e) {}
+    }
+
+    // 3. Metadata Section
+    const metaY = boxY + 15;
+    
+    // Col 1: Billed To
+    doc.setFontSize(9);
+    setTextColor(colorGray);
+    doc.text('Billed to', 20, metaY);
+    
+    const hasArabic = /[\u0600-\u06FF]/.test(sale.customer_name);
+    if (hasArabic) {
+        renderArabic(sale.customer_name, 20, metaY + 6, 10, '#1e293b', 'left', true);
+    } else {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        setTextColor(colorDark);
+        doc.text(sale.customer_name || 'Walking Customer', 20, metaY + 6);
+    }
+
+    if (sale.customer_address) {
+        const addrArabic = /[\u0600-\u06FF]/.test(sale.customer_address);
+        if (addrArabic) {
+            renderArabic(sale.customer_address, 20, metaY + 11, 9, '#64748b', 'left', false);
+        } else {
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(9);
+            setTextColor(colorGray);
+            doc.text(sale.customer_address, 20, metaY + 11);
+        }
+    } else {
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(9);
-        if (sale.customer_address) {
-            const addrArabic = /[\u0600-\u06FF]/.test(sale.customer_address);
-            if (addrArabic) {
-                renderArabic(sale.customer_address, 20, 87, 9, '#64748b');
-            } else {
-                doc.text(sale.customer_address, 20, 87);
-            }
-        } else {
-            doc.text('Al Ain, United Arab Emirates.', 20, 87);
-        }
-        
-        const isTaxEnabled = sale.has_tax === true || sale.has_tax === 1 || sale.has_tax === '1';
+        setTextColor(colorGray);
+        doc.text('United Arab Emirates', 20, metaY + 11);
+    }
 
+    // Subject (Under Billed To)
+    const subjY = metaY + 30;
+    doc.setFontSize(9);
+    setTextColor(colorGray);
+    doc.text('Subject', 20, subjY);
+    doc.setFont('helvetica', 'bold');
+    setTextColor(colorDark);
+    doc.text('Export Sale', 20, subjY + 6);
+
+    // Col 2: Invoice Info
+    const col2X = W / 2 - 20;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    setTextColor(colorGray);
+    doc.text('Invoice number', col2X, metaY);
+    doc.setFont('helvetica', 'bold');
+    setTextColor(colorDark);
+    doc.text(sale.invoice_number, col2X, metaY + 6);
+
+    doc.setFont('helvetica', 'normal');
+    setTextColor(colorGray);
+    doc.text('Reference', col2X, metaY + 14);
+    doc.setFont('helvetica', 'bold');
+    setTextColor(colorDark);
+    doc.text(sale.container_number || 'N/A', col2X, metaY + 20);
+
+    doc.setFont('helvetica', 'normal');
+    setTextColor(colorGray);
+    doc.text('Invoice date', col2X, subjY);
+    doc.setFont('helvetica', 'bold');
+    setTextColor(colorDark);
+    doc.text(sale.date, col2X, subjY + 6);
+
+    // Col 3: Amount & Due Date
+    const col3X = W - 20;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    setTextColor(colorGray);
+    doc.text(`Invoice of (${sale.currency || 'AED'})`, col3X, metaY, { align: 'right' });
+    
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(18);
+    setTextColor(colorOrange);
+    doc.text(`${parseFloat(sale.amount).toLocaleString('en-US', {minimumFractionDigits: 2})}`, col3X, metaY + 8, { align: 'right' });
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    setTextColor(colorGray);
+    doc.text('Payment Terms', col3X, subjY, { align: 'right' });
+    doc.setFont('helvetica', 'bold');
+    setTextColor(colorDark);
+    doc.text('Due on Receipt', col3X, subjY + 6, { align: 'right' });
+
+    // 4. Table Header
+    const tableHeaderY = subjY + 18;
+    setDrawColor(colorBorder);
+    doc.setLineWidth(0.2);
+    doc.line(15, tableHeaderY, W - 15, tableHeaderY);
+    
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    setTextColor(colorLightGray);
+    // Table Headers
+    const textY = tableHeaderY + 5;
+    doc.text('#', 20, textY);
+    doc.text('Description', 30, textY);
+    doc.text('Qty', W - 85, textY, { align: 'right' });
+    if (isTaxEnabled) {
+        doc.text('Rate', W - 60, textY, { align: 'right' });
+        doc.text('VAT 5%', W - 40, textY, { align: 'right' });
+    } else {
+        doc.text('Rate', W - 50, textY, { align: 'right' });
+    }
+    doc.text('Amount', W - 20, textY, { align: 'right' });
+
+    const tableHeaderBottomY = tableHeaderY + 8;
+    doc.line(15, tableHeaderBottomY, W - 15, tableHeaderBottomY);
+
+    // 5. Table Rows
+    let currentY = tableHeaderBottomY + 8;
+    let subtotal = 0;
+    let totalVat = 0;
+
+    const itemsCount = sale.items ? sale.items.length : 0;
+    const totalRows = Math.max(10, itemsCount);
+
+    if (itemsCount === 0) {
+        // Fallback if no items but has amount
+        subtotal = parseFloat(sale.amount || 0);
         if (isTaxEnabled) {
-            doc.text('TRN: ' + (sale.trn || '100267536900003'), 20, 92);
-        }
-
-        // Right: Invoice Meta
-        const metaX = W - 80;
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(9);
-        doc.text('Invoice#', metaX, 75);
-        doc.text('Invoice Date', metaX, 82);
-        doc.text('Payment Terms', metaX, 89);
-        
-        doc.setFont('helvetica', 'normal');
-        doc.text(sale.invoice_number, metaX + 30, 75);
-        doc.text(sale.date, metaX + 30, 82);
-        doc.text('Due on Receipt', metaX + 30, 89);
-
-        // --- Table Section ---
-        const tableY = 105;
-        const rowHeight = 8;
-        const totalRows = 12;
-
-        // Header
-        doc.setFillColor(248, 250, 252);
-        doc.rect(20, tableY, W - 40, rowHeight, 'F');
-        doc.setDrawColor(200, 200, 200);
-        doc.rect(20, tableY, W - 40, rowHeight, 'D');
-
-        doc.setFontSize(8);
-        doc.setFont('helvetica', 'bold');
-        doc.text('#', 22, tableY + 5.5);
-        doc.text('Description', 30, tableY + 5.5);
-        doc.text('Qty', W - 85, tableY + 5.5, { align: 'right' });
-        doc.text('Rate', W - 65, tableY + 5.5, { align: 'right' });
-        if (sale.has_tax) {
-            doc.text('VAT 5%', W - 45, tableY + 5.5, { align: 'right' });
-        }
-        doc.text('Amount', W - 25, tableY + 5.5, { align: 'right' });
-
-        doc.setFont('helvetica', 'normal');
-        let currentY = tableY + rowHeight;
-        let subtotal = 0;
-        let totalVat = 0;
-
-        for (let i = 0; i < totalRows; i++) {
-            const item = sale.items && sale.items[i];
-            doc.rect(20, currentY, W - 40, rowHeight, 'D');
-            doc.line(28, currentY, 28, currentY + rowHeight);
-            doc.line(W - 95, currentY, W - 95, currentY + rowHeight);
-            doc.line(W - 75, currentY, W - 75, currentY + rowHeight);
-            if (sale.has_tax) {
-                doc.line(W - 55, currentY, W - 55, currentY + rowHeight);
-                doc.line(W - 35, currentY, W - 35, currentY + rowHeight);
-            } else {
-                doc.line(W - 35, currentY, W - 35, currentY + rowHeight);
-            }
-
-            if (item) {
-                const qty = parseFloat(item.quantity || 0);
-                const rate = parseFloat(item.rate || 0);
-                const lineTotal = qty * rate;
-                const lineVat = sale.has_tax ? (lineTotal * 0.05) : 0;
-                subtotal += lineTotal;
-                totalVat += lineVat;
-
-                doc.text(String(i + 1), 24, currentY + 5.5, { align: 'center' });
-                
-                const itemName = item.name || 'Product Item';
-                if (/[\u0600-\u06FF]/.test(itemName)) {
-                    renderArabic(itemName, 30, currentY + 5.5, 9);
-                } else {
-                    doc.text(itemName, 30, currentY + 5.5);
-                }
-
-                doc.text(qty.toFixed(2), W - 77, currentY + 5.5, { align: 'right' });
-                doc.text(rate.toFixed(2), W - 57, currentY + 5.5, { align: 'right' });
-                if (sale.has_tax) {
-                    doc.text(lineVat.toFixed(2), W - 37, currentY + 5.5, { align: 'right' });
-                }
-                doc.text((sale.has_tax ? (lineTotal + lineVat) : lineTotal).toFixed(2), W - 22, currentY + 5.5, { align: 'right' });
-            }
-            currentY += rowHeight;
-        }
-
-        if (subtotal === 0 && sale.amount > 0) {
-            subtotal = parseFloat(sale.amount) / 1.05;
+            subtotal = subtotal / 1.05;
             totalVat = subtotal * 0.05;
         }
+    }
 
-        // --- Totals Section ---
-        currentY += 5;
-        const totalX = W - 70;
+    for (let i = 0; i < totalRows; i++) {
+        setTextColor(colorDark);
+        doc.setFont('helvetica', 'bold');
         doc.setFontSize(9);
-        doc.setFont('helvetica', 'normal');
-        
-        if (isTaxEnabled) {
-            doc.text('Sub Total (Net)', totalX, currentY);
-            doc.text(subtotal.toFixed(2), W - 25, currentY, { align: 'right' });
+        doc.text(String(i + 1), 20, currentY);
+
+        if (i < itemsCount) {
+            const item = sale.items[i];
+            const qty = parseFloat(item.quantity || 0);
+            const rate = parseFloat(item.rate || 0);
+            const lineTotal = qty * rate;
+            const lineVat = isTaxEnabled ? (lineTotal * 0.05) : 0;
+            subtotal += lineTotal;
+            totalVat += lineVat;
+
+            const itemName = item.name || 'Product Item';
+            if (/[\u0600-\u06FF]/.test(itemName)) {
+                renderArabic(itemName, 30, currentY, 9, '#1e293b', 'left', true);
+            } else {
+                setTextColor(colorDark);
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(9);
+                doc.text(itemName, 30, currentY);
+            }
+
+            setTextColor(colorDark);
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(9);
+            doc.text(qty.toString(), W - 85, currentY, { align: 'right' });
             
-            currentY += 7;
-            doc.text('VAT (5%)', totalX, currentY);
-            doc.text(totalVat.toFixed(2), W - 25, currentY, { align: 'right' });
+            // Format numbers with commas
+            const rateStr = rate.toLocaleString('en-US', {minimumFractionDigits: 2});
+            const amtStr = (isTaxEnabled ? (lineTotal + lineVat) : lineTotal).toLocaleString('en-US', {minimumFractionDigits: 2});
             
-            currentY += 7;
+            if (isTaxEnabled) {
+                const vatStr = lineVat.toLocaleString('en-US', {minimumFractionDigits: 2});
+                doc.text(rateStr, W - 60, currentY, { align: 'right' });
+                doc.text(vatStr, W - 40, currentY, { align: 'right' });
+            } else {
+                doc.text(rateStr, W - 50, currentY, { align: 'right' });
+            }
+            doc.text(amtStr, W - 20, currentY, { align: 'right' });
         }
-        currentY += 7;
 
-        doc.setFont('helvetica', 'bold');
-        doc.text('Grand Total', totalX, currentY);
-        const finalTotal = sale.has_tax ? (subtotal + totalVat) : subtotal;
-        doc.text(`${sale.currency || 'AED'} ${finalTotal.toFixed(2)}`, W - 25, currentY, { align: 'right' });
+        currentY += 8; // Spacing between rows
+
+        // Draw a light separator line between rows
+        if (i < totalRows - 1) {
+            setDrawColor([241, 245, 249]); // Very light gray (slate-100)
+            doc.setLineWidth(0.1);
+            doc.line(15, currentY - 4, W - 15, currentY - 4);
+        }
+    }
+
+    // 6. Totals Section
+    currentY += 5;
+    doc.line(15, currentY, W - 15, currentY);
+    
+    currentY += 8;
+    const totalsLeftX = W / 2 + 10;
+    
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    setTextColor(colorDark);
+    
+    if (isTaxEnabled) {
+        doc.text('Subtotal', totalsLeftX, currentY);
+        doc.text(subtotal.toLocaleString('en-US', {minimumFractionDigits: 2}), W - 20, currentY, { align: 'right' });
         
         currentY += 7;
-        doc.setFont('helvetica', 'normal');
-        doc.text('Paid Amount', totalX, currentY);
-        doc.text(`${sale.currency || 'AED'} ${parseFloat(sale.paid_amount || 0).toFixed(2)}`, W - 25, currentY, { align: 'right' });
-
+        doc.text('Tax (5%)', totalsLeftX, currentY);
+        doc.text(totalVat.toLocaleString('en-US', {minimumFractionDigits: 2}), W - 20, currentY, { align: 'right' });
         currentY += 7;
-        doc.setDrawColor(200, 200, 200);
-        doc.line(totalX, currentY - 2, W - 20, currentY - 2);
-        
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(225, 29, 72); // Rose-600 color for balance
-        doc.text('Balance Due', totalX, currentY + 3);
-        doc.text(`${sale.currency || 'AED'} ${parseFloat(sale.due_amount || 0).toFixed(2)}`, W - 25, currentY + 3, { align: 'right' });
-        doc.setTextColor(30, 41, 59); // Reset color
+    }
+    
+    currentY += 3;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    const finalTotal = isTaxEnabled ? (subtotal + totalVat) : subtotal;
+    doc.text('Total', totalsLeftX, currentY);
+    doc.text(finalTotal.toLocaleString('en-US', {minimumFractionDigits: 2}), W - 20, currentY, { align: 'right' });
 
-        // Footer Section
-        const footerY = H - 60;
-        doc.setFontSize(8);
-        doc.setFont('helvetica', 'normal');
-        doc.text('Customer Signature & Date _________________________', 20, footerY);
-        doc.setFontSize(7);
-        doc.text('Received the above material in good condition.', 65, footerY + 4);
+    currentY += 8;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    setTextColor(colorGray);
+    doc.text('Paid Amount', totalsLeftX, currentY);
+    doc.text(parseFloat(sale.paid_amount || 0).toLocaleString('en-US', {minimumFractionDigits: 2}), W - 20, currentY, { align: 'right' });
 
-        doc.save(`Invoice_${sale.invoice_number}.pdf`);
-    };
-    img.onerror = () => alert('Template image not found at /assets/images/invoice.png');
+    currentY += 8;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    setTextColor(colorDark);
+    doc.text('Balance Due', totalsLeftX, currentY);
+    doc.text(parseFloat(sale.due_amount || 0).toLocaleString('en-US', {minimumFractionDigits: 2}), W - 20, currentY, { align: 'right' });
+
+    // 7. Footer inside box
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    setTextColor(colorDark);
+    doc.text('Thanks for the business.', 20, boxY + boxH - 10);
+
+    // 8. Footer outside box
+    const footerY = boxY + boxH + 10;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    setTextColor(colorGray);
+    doc.text('Terms & Conditions', 15, footerY);
+    doc.text('Received the above material in good condition. Customer Signature: _________________________', 15, footerY + 5);
+
+    doc.save(`Invoice_${sale.invoice_number}.pdf`);
 };
 
 
