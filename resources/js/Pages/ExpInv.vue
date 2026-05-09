@@ -214,16 +214,29 @@ const shippingStatuses = ['On Board', 'In Transit', 'Delivered'];
 const statuses = [{label: 'All Status', value: 'all'}, {label: 'Paid', value: 'paid'}, {label: 'Partial', value: 'partial'}, {label: 'Pending', value: 'pending'}];
 
 const exportInvoicePDF = async (sale) => {
-    const loadImg = (src) => new Promise((resolve) => {
+    const loadImgBase64 = (src) => new Promise((resolve) => {
         const img = new Image();
-        img.src = src;
-        img.onload = () => resolve(img);
+        img.crossOrigin = 'Anonymous';
+        img.src = src + '?v=' + new Date().getTime(); // Bust cache to ensure fresh load
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0);
+            resolve({
+                data: canvas.toDataURL('image/png'),
+                width: img.width,
+                height: img.height
+            });
+        };
         img.onerror = () => resolve(null);
     });
 
-    const [logoImg, watermarkImg] = await Promise.all([
-        loadImg('/assets/images/logo.png'),
-        loadImg('/assets/images/logoblack.png')
+    const [logoData, watermarkData] = await Promise.all([
+        loadImgBase64('/assets/images/logo.png'),
+        loadImgBase64('/assets/images/logoblack.png')
     ]);
 
     const doc = new jsPDF();
@@ -255,7 +268,7 @@ const exportInvoicePDF = async (sale) => {
         const w = (textWidth / fontSizePx) * h;
         
         const finalX = align === 'right' ? (x - w) : x;
-        doc.addImage(imgData, 'PNG', finalX, y - (h / 2), w, h);
+        doc.addImage(imgData, 'PNG', finalX, y - (h / 2), w, h, undefined, 'FAST');
     };
 
     // Colors
@@ -274,16 +287,13 @@ const exportInvoicePDF = async (sale) => {
     // 1. Top Header (Outside Box)
     // Left: Company Info
     let logoW = 0;
-    if (logoImg) {
+    if (logoData) {
         let h = 16;
-        let w = 16;
-        if (logoImg.width && logoImg.height) {
-            w = h * (logoImg.width / logoImg.height);
-        }
+        let w = (h * logoData.width) / logoData.height;
         logoW = w;
-        doc.addImage(logoImg, 'PNG', 15, 17, w, h);
+        doc.addImage(logoData.data, 'PNG', 15, 17, w, h, undefined, 'FAST');
     }
-    const leftTextX = logoImg ? 15 + logoW + 4 : 15;
+    const leftTextX = logoData ? 15 + logoW + 4 : 15;
 
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(20);
@@ -315,16 +325,13 @@ const exportInvoicePDF = async (sale) => {
     doc.roundedRect(15, boxY, W - 30, boxH, 3, 3, 'S');
 
     // Watermark
-    if (watermarkImg) {
+    if (watermarkData) {
         let wmH = 130;
-        let wmW = 130;
-        if (watermarkImg.width && watermarkImg.height) {
-            wmW = wmH * (watermarkImg.width / watermarkImg.height);
-        }
+        let wmW = (wmH * watermarkData.width) / watermarkData.height;
         try {
             doc.setGState(new doc.GState({opacity: 0.3}));
         } catch (e) {}
-        doc.addImage(watermarkImg, 'PNG', (W - wmW) / 2, (H - wmH) / 2, wmW, wmH);
+        doc.addImage(watermarkData.data, 'PNG', (W - wmW) / 2, (H - wmH) / 2, wmW, wmH, undefined, 'FAST');
         try {
             doc.setGState(new doc.GState({opacity: 1.0}));
         } catch (e) {}
