@@ -28,7 +28,8 @@ class Sale extends Model
         'customer_address',
         'has_tax',
         'currency',
-        'trn'
+        'trn',
+        'notes'
     ];
 
     protected $casts = [

@@ -83,5 +83,10 @@ Route::middleware('auth')->group(function () {
     Route::post('/cheques/{cheque}/clear', [\App\Http\Controllers\ChequeController::class, 'clear']);
     Route::delete('/cheques/{cheque}', [\App\Http\Controllers\ChequeController::class, 'destroy']);
 
+    Route::get('/users', [\App\Http\Controllers\UserController::class, 'index'])->name('users');
+    Route::post('/users', [\App\Http\Controllers\UserController::class, 'store']);
+    Route::put('/users/{user}', [\App\Http\Controllers\UserController::class, 'update']);
+    Route::delete('/users/{user}', [\App\Http\Controllers\UserController::class, 'destroy']);
+
     Route::get('/activity-log', [\App\Http\Controllers\ActivityLogController::class, 'index'])->name('activity-log');
 });

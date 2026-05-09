@@ -94,6 +94,7 @@ class SaleController extends Controller
             'has_tax' => 'nullable|boolean',
             'currency' => 'nullable|string',
             'trn' => 'nullable|string',
+            'notes' => 'nullable|string',
 
         ]);
 
@@ -179,6 +180,7 @@ class SaleController extends Controller
             'has_tax' => 'nullable|boolean',
             'currency' => 'nullable|string',
             'trn' => 'nullable|string',
+            'notes' => 'nullable|string',
 
         ]);
 
@@ -212,6 +214,33 @@ class SaleController extends Controller
         \App\Models\Sale::withoutEvents(function () use ($sale, $validated) {
             $sale->update($validated);
         });
+
+        // Sync Initial Payment with Bank System
+        if ($sale->bank_id) {
+            $initialPayment = \App\Models\SalePayment::where('sale_id', $sale->id)
+                ->where('note', 'Initial payment upon creation')
+                ->first();
+
+            if ($validated['paid_amount'] > 0) {
+                if ($initialPayment) {
+                    $initialPayment->update([
+                        'bank_id' => $sale->bank_id,
+                        'amount' => $validated['paid_amount'],
+                        'date' => $validated['date'],
+                    ]);
+                } else {
+                    \App\Models\SalePayment::create([
+                        'sale_id' => $sale->id,
+                        'bank_id' => $sale->bank_id,
+                        'amount' => $validated['paid_amount'],
+                        'date' => $validated['date'],
+                        'note' => 'Initial payment upon creation'
+                    ]);
+                }
+            } elseif ($initialPayment) {
+                $initialPayment->delete();
+            }
+        }
 
         \App\Services\ActivityLogger::log('updated', 'Updated ' . $sale->type . ' sale: ' . $sale->invoice_number, $sale);
 
@@ -253,8 +282,6 @@ class SaleController extends Controller
         \App\Models\Sale::withoutEvents(function () use ($sale) {
             $sale->save();
         });
-
-        \App\Services\ActivityLogger::log('updated', 'Recorded payment of ' . $request->payment_amount . ' for sale: ' . $sale->invoice_number, $sale);
 
         return redirect()->back();
     }

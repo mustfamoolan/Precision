@@ -9,6 +9,7 @@ import SelectInput from '@/Components/SelectInput.vue';
 import Badge from '@/Components/Badge.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
+import TextArea from '@/Components/TextArea.vue';
 import Pagination from '@/Components/Pagination.vue';
 import { jsPDF } from 'jspdf';
 
@@ -47,6 +48,7 @@ const form = useForm({
     type: 'local',
     paid_amount: '',
     bank_id: '',
+    notes: '',
 });
 
 const paymentForm = useForm({
@@ -65,6 +67,7 @@ const openModal = (sale = null) => {
         form.type = sale.type;
         form.paid_amount = sale.paid_amount;
         form.bank_id = sale.bank_id || '';
+        form.notes = sale.notes || '';
     } else {
         editingSale.value = null;
         form.reset();
@@ -547,6 +550,10 @@ const statuses = [{label: 'All Status', value: 'all'}, {label: 'Paid', value: 'p
                         v-model="form.bank_id" 
                         :options="[{label: 'None / Cash', value: ''}, ...banks.map(b => ({ label: b.name, value: b.id }))]" 
                     />
+                </FormField>
+
+                <FormField label="Notes / Remarks (Optional)" :error="form.errors.notes">
+                    <TextArea v-model="form.notes" placeholder="Enter any additional notes..." rows="3" />
                 </FormField>
 
                 <div class="pt-6 flex justify-end gap-3 border-t border-slate-100 mt-6">

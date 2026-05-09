@@ -9,6 +9,7 @@ import SelectInput from '@/Components/SelectInput.vue';
 import Badge from '@/Components/Badge.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
+import TextArea from '@/Components/TextArea.vue';
 import Pagination from '@/Components/Pagination.vue';
 import { jsPDF } from 'jspdf';
 
@@ -64,6 +65,7 @@ const form = useForm({
     has_tax: true,
     currency: 'AED',
     trn: '100267536900003',
+    notes: '',
 });
 
 const paymentForm = useForm({
@@ -107,6 +109,7 @@ const openEditModal = (sale) => {
     form.has_tax = sale.has_tax !== undefined ? !!sale.has_tax : true;
     form.currency = sale.currency || 'AED';
     form.trn = sale.trn || '100267536900003';
+    form.notes = sale.notes || '';
     showAddModal.value = true;
 };
 
@@ -304,8 +307,8 @@ const exportInvoicePDF = async (sale) => {
     doc.setFontSize(9);
     setTextColor(colorGray);
     doc.text('www.alshamly.ae', leftTextX, 26);
-    doc.text('INQUIRY@ALSHAMLY.AE', leftTextX, 31);
-    doc.text('04 2286 643', leftTextX, 36);
+    doc.text('Inquiry@alshamly.ae', leftTextX, 31);
+    doc.text('+971 4 228 6643', leftTextX, 36);
 
     // Right: Business Address
     doc.setFont('helvetica', 'normal');
@@ -313,9 +316,7 @@ const exportInvoicePDF = async (sale) => {
     setTextColor(colorGray);
     doc.text('P.O BOX 261831 JEBEL ALI DUBAI', W - 15, 25, { align: 'right' });
     doc.text('U.A.E', W - 15, 31, { align: 'right' });
-    if (isTaxEnabled) {
-        doc.text('TRN: ' + (sale.trn || '100267536900003'), W - 15, 36, { align: 'right' });
-    }
+    doc.text('TRN: 100267536900003', W - 15, 36, { align: 'right' });
 
     // 2. The Big Rounded Box
     const boxY = 45;
@@ -370,6 +371,13 @@ const exportInvoicePDF = async (sale) => {
         doc.setFontSize(9);
         setTextColor(colorGray);
         doc.text('United Arab Emirates', 20, metaY + 11);
+    }
+
+    if (isTaxEnabled && sale.trn) {
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+        setTextColor(colorGray);
+        doc.text('TRN: ' + sale.trn, 20, metaY + 16);
     }
 
     // Subject (Under Billed To)
@@ -527,6 +535,7 @@ const exportInvoicePDF = async (sale) => {
     
     currentY += 8;
     const totalsLeftX = W / 2 + 10;
+    const notesY = currentY;
     
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
@@ -562,6 +571,37 @@ const exportInvoicePDF = async (sale) => {
     setTextColor(colorDark);
     doc.text('Balance Due', totalsLeftX, currentY);
     doc.text(parseFloat(sale.due_amount || 0).toLocaleString('en-US', {minimumFractionDigits: 2}), W - 20, currentY, { align: 'right' });
+
+    // Notes Section (Left side with Box Design - Updated to match invoice style)
+    if (sale.notes) {
+        const notesBoxW = (W / 2) - 25;
+        const notesBoxH = 35;
+        
+        // Background & Border
+        doc.setFillColor(252, 252, 253); 
+        doc.roundedRect(18, notesY - 5, notesBoxW, notesBoxH, 2, 2, 'F');
+        
+        setDrawColor(colorBorder);
+        doc.setLineWidth(0.1);
+        doc.roundedRect(18, notesY - 5, notesBoxW, notesBoxH, 2, 2, 'S');
+
+        const isArabic = /[\u0600-\u06FF]/.test(sale.notes);
+        if (isArabic) {
+            renderArabic('Notes', 22, notesY - 1, 9, '#1e293b', 'left', true);
+            renderArabic(sale.notes, 22, notesY + 8, 9, '#334155', 'left', false);
+        } else {
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(9);
+            setTextColor(colorDark);
+            doc.text('Notes / Remarks', 22, notesY - 1);
+            
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(9);
+            setTextColor(colorDark);
+            const splitNotes = doc.splitTextToSize(sale.notes, notesBoxW - 8);
+            doc.text(splitNotes, 22, notesY + 5);
+        }
+    }
 
     // 7. Footer inside box
     doc.setFont('helvetica', 'bold');
@@ -861,6 +901,10 @@ const exportInvoicePDF = async (sale) => {
                         v-model="form.bank_id" 
                         :options="[{label: 'None / Cash', value: ''}, ...banks.map(b => ({ label: b.name, value: b.id }))]" 
                     />
+                </FormField>
+
+                <FormField label="Notes / Remarks (Optional)" :error="form.errors.notes">
+                    <TextArea v-model="form.notes" placeholder="Enter any additional notes..." rows="3" />
                 </FormField>
 
                 <!-- Items Section -->

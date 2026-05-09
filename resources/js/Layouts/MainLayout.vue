@@ -96,6 +96,7 @@ const navItems = [
     { name: 'Shipping Tool', icon: 'local_shipping', href: '/shipping' },
     { name: 'Reports', icon: 'analytics', href: '/reports' },
     { name: 'Banks', icon: 'account_balance', href: '/banks' },
+    { name: 'User Management', icon: 'group', href: '/users' },
     { name: 'Activity Log', icon: 'history', href: '/activity-log' },
 ];
 

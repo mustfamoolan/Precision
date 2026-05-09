@@ -38,6 +38,9 @@ class HandleInertiaRequests extends Middleware
         return [
             ...parent::share($request),
             'pending_reminders_count' => \App\Models\Reminder::where('status', 'pending')->count(),
+            'auth' => [
+                'user' => $request->user(),
+            ],
         ];
     }
 }
