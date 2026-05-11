@@ -27,7 +27,7 @@ class DatabaseSeeder extends Seeder
         );
 
         // Default Bank Accounts
-        $banks = ['Bank 1', 'Bank 2', 'Cash'];
+        $banks = ['NBF', 'Mashreq', 'CASH'];
         foreach ($banks as $bankName) {
             Bank::firstOrCreate(
                 ['name' => $bankName],
