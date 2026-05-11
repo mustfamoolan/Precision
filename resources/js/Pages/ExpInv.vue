@@ -476,12 +476,12 @@ const exportInvoicePDF = async (sale) => {
     }
 
     for (let i = 0; i < totalRows; i++) {
-        setTextColor(colorDark);
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(9);
-        doc.text(String(i + 1), 20, currentY);
-
         if (i < itemsCount) {
+            setTextColor(colorDark);
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(9);
+            doc.text(String(i + 1), 20, currentY);
+
             const item = sale.items[i];
             const qty = parseFloat(item.quantity || 0);
             const rate = parseFloat(item.rate || 0);
