@@ -140,7 +140,7 @@ const formatPrice = (amount) => new Intl.NumberFormat('en-AE', { style: 'currenc
                 <h1 class="text-4xl font-black text-slate-900 tracking-tight">Financial Hub</h1>
                 <p class="mt-2 text-slate-500 font-medium">Global transaction tracking and cash management</p>
             </div>
-            <div class="flex items-center gap-3">
+            <div class="flex items-center gap-3" v-if="$page.props.auth.user.role !== 'viewer'">
                 <button 
                     @click="openAddBankModal"
                     class="bg-white text-slate-700 px-6 py-3 rounded-2xl font-bold border border-slate-200 shadow-sm hover:bg-slate-50 transition-all flex items-center gap-2 active:scale-95"
@@ -168,7 +168,7 @@ const formatPrice = (amount) => new Intl.NumberFormat('en-AE', { style: 'currenc
                             <span class="material-symbols-outlined text-3xl">{{ bank.name.toLowerCase().includes('cash') ? 'payments' : 'account_balance' }}</span>
                         </div>
                         <div class="flex gap-2">
-                            <button @click="openAdjustmentModal(bank)" class="w-8 h-8 rounded-lg bg-white border border-slate-100 flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:border-indigo-100 transition-all shadow-sm" title="Add/Subtract Balance">
+                            <button v-if="$page.props.auth.user.role !== 'viewer'" @click="openAdjustmentModal(bank)" class="w-8 h-8 rounded-lg bg-white border border-slate-100 flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:border-indigo-100 transition-all shadow-sm" title="Add/Subtract Balance">
                                 <span class="material-symbols-outlined text-[18px]">add_circle</span>
                             </button>
                             <span class="px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest" :class="bank.name.toLowerCase().includes('cash') ? 'bg-emerald-50 text-emerald-600' : 'bg-indigo-50 text-indigo-600'">
@@ -181,8 +181,8 @@ const formatPrice = (amount) => new Intl.NumberFormat('en-AE', { style: 'currenc
                         <h2 class="text-3xl font-black text-slate-900 tracking-tighter">{{ formatPrice(bank.balance) }}</h2>
                     </div>
                     <div class="mt-6 pt-4 border-t border-slate-50 flex items-center justify-between">
-                         <button @click="openAdjustmentModal(bank)" class="text-[10px] font-black uppercase tracking-widest text-indigo-600 hover:text-indigo-700 transition-colors">Quick Adjust</button>
-                         <span class="text-[10px] font-bold text-slate-300 uppercase tracking-widest">ID: #{{ bank.id }}</span>
+                         <button v-if="$page.props.auth.user.role !== 'viewer'" @click="openAdjustmentModal(bank)" class="text-[10px] font-black uppercase tracking-widest text-indigo-600 hover:text-indigo-700 transition-colors">Quick Adjust</button>
+                         <span class="text-[10px] font-bold text-slate-300 uppercase tracking-widest" :class="{'ml-auto': $page.props.auth.user.role === 'viewer'}">ID: #{{ bank.id }}</span>
                     </div>
                 </div>
             </div>
@@ -328,7 +328,7 @@ const formatPrice = (amount) => new Intl.NumberFormat('en-AE', { style: 'currenc
                                     </td>
                                     <td class="py-6 px-8 text-2xl font-black text-slate-900">{{ formatPrice(cheque.amount) }}</td>
                                     <td class="py-6 px-8 text-right">
-                                        <div v-if="cheque.status === 'pending'" class="flex justify-end gap-2">
+                                        <div v-if="cheque.status === 'pending' && $page.props.auth.user.role !== 'viewer'" class="flex justify-end gap-2">
                                             <button 
                                                 v-if="cheque.type === 'incoming'"
                                                 @click="selectedCheque = cheque; receiveForm.bank_id = ''; isReceiveModalOpen = true"
@@ -340,9 +340,12 @@ const formatPrice = (amount) => new Intl.NumberFormat('en-AE', { style: 'currenc
                                                 class="px-4 py-2 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-md shadow-indigo-100"
                                             >Mark Cleared</button>
                                         </div>
-                                        <div v-else class="text-emerald-500 flex items-center justify-end gap-1">
+                                        <div v-else-if="cheque.status !== 'pending'" class="text-emerald-500 flex items-center justify-end gap-1">
                                             <span class="material-symbols-outlined text-xl">check_circle</span>
                                             <span class="text-[10px] font-black uppercase tracking-widest">Processed</span>
+                                        </div>
+                                        <div v-else class="text-slate-400 flex items-center justify-end gap-1 italic">
+                                            <span class="text-[10px] font-bold uppercase tracking-widest">Pending</span>
                                         </div>
                                     </td>
                                 </tr>

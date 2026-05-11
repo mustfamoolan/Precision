@@ -291,7 +291,7 @@ const getBrandName = (id) => {
                     </button>
                 </div>
                 
-                <PrimaryButton v-if="activeTab === 'inventory'" @click="openAddModal" class="!bg-indigo-600 h-[46px] px-6 rounded-2xl shadow-lg shadow-indigo-100 flex items-center gap-2">
+                <PrimaryButton v-if="activeTab === 'inventory' && $page.props.auth.user.role !== 'viewer'" @click="openAddModal" class="!bg-indigo-600 h-[46px] px-6 rounded-2xl shadow-lg shadow-indigo-100 flex items-center gap-2">
                     <span class="material-symbols-outlined text-[18px]">add_circle</span>
                     Add Product
                 </PrimaryButton>
@@ -351,7 +351,7 @@ const getBrandName = (id) => {
                 <div v-if="brands.length === 0" class="col-span-full py-20 text-center bg-surface-container-low/20 rounded-[2rem] border-2 border-dashed border-outline-variant/20">
                     <span class="material-symbols-outlined text-6xl text-outline mb-4">branding_watermark</span>
                     <h3 class="text-xl font-headline font-bold text-outline">No brands added yet</h3>
-                    <PrimaryButton @click="showBrandModal = true" class="mt-4">Add Your First Brand</PrimaryButton>
+                    <PrimaryButton v-if="$page.props.auth.user.role !== 'viewer'" @click="showBrandModal = true" class="mt-4">Add Your First Brand</PrimaryButton>
                 </div>
             </div>
 
@@ -417,21 +417,23 @@ const getBrandName = (id) => {
                                         <button @click="openItemHistoryModal(item)" class="p-2 text-indigo-500 hover:bg-indigo-50 rounded-lg transition-colors" title="View Product History">
                                             <span class="material-symbols-outlined text-[20px]">history</span>
                                         </button>
-                                        <button @click="openAdjustModal(item)" class="p-2 text-emerald-500 hover:bg-emerald-50 rounded-lg transition-colors" title="Increase/Decrease Stock">
-                                            <span class="material-symbols-outlined text-[20px]">add_box</span>
-                                        </button>
-                                        <button @click="openDeductModal(item)" class="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors" title="Customer Deduction">
-                                            <span class="material-symbols-outlined text-[20px]">person_remove</span>
-                                        </button>
-                                        <button @click="openTransferModal(item)" class="p-2 text-orange-500 hover:bg-orange-50 rounded-lg transition-colors" title="Transfer">
-                                            <span class="material-symbols-outlined text-[20px]">swap_horiz</span>
-                                        </button>
-                                        <button @click="openEditModal(item)" class="p-2 text-outline hover:text-primary transition-colors">
-                                            <span class="material-symbols-outlined text-[20px]">edit</span>
-                                        </button>
-                                        <button @click="confirmDelete(item.id)" class="p-2 text-outline hover:text-error transition-colors">
-                                            <span class="material-symbols-outlined text-[20px]">delete</span>
-                                        </button>
+                                        <template v-if="$page.props.auth.user.role !== 'viewer'">
+                                            <button @click="openAdjustModal(item)" class="p-2 text-emerald-500 hover:bg-emerald-50 rounded-lg transition-colors" title="Increase/Decrease Stock">
+                                                <span class="material-symbols-outlined text-[20px]">add_box</span>
+                                            </button>
+                                            <button @click="openDeductModal(item)" class="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors" title="Customer Deduction">
+                                                <span class="material-symbols-outlined text-[20px]">person_remove</span>
+                                            </button>
+                                            <button @click="openTransferModal(item)" class="p-2 text-orange-500 hover:bg-orange-50 rounded-lg transition-colors" title="Transfer">
+                                                <span class="material-symbols-outlined text-[20px]">swap_horiz</span>
+                                            </button>
+                                            <button @click="openEditModal(item)" class="p-2 text-outline hover:text-primary transition-colors">
+                                                <span class="material-symbols-outlined text-[20px]">edit</span>
+                                            </button>
+                                            <button @click="confirmDelete(item.id)" class="p-2 text-outline hover:text-error transition-colors">
+                                                <span class="material-symbols-outlined text-[20px]">delete</span>
+                                            </button>
+                                        </template>
                                     </div>
                                 </td>
                             </tr>

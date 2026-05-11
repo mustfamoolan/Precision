@@ -112,6 +112,7 @@ const completedCount = computed(() => props.kpi.done);
                 <p class="text-sm text-outline font-label">Logistics, Inventory & Task Management</p>
             </div>
             <button 
+                v-if="$page.props.auth.user.role !== 'viewer'"
                 @click="openModal()" 
                 class="bg-primary text-on-primary px-6 py-2.5 rounded-xl font-bold flex items-center gap-2 hover:bg-primary/90 transition-all active:scale-95 shadow-lg shadow-primary/20"
             >
@@ -213,7 +214,7 @@ const completedCount = computed(() => props.kpi.done);
                                 </div>
                             </td>
                             <td class="py-5 px-6 text-right">
-                                <div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity" v-if="$page.props.auth.user.role !== 'viewer'">
                                     <button @click="openModal(r)" class="p-1.5 text-outline hover:text-primary transition-colors">
                                         <span class="material-symbols-outlined text-[20px]">edit</span>
                                     </button>

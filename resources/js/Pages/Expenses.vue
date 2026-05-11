@@ -294,7 +294,7 @@ const statuses = ['Paid', 'Partial', 'Unpaid'];
                     />
                 </div>
 
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-2" v-if="$page.props.auth.user.role !== 'viewer'">
                     <button @click="showAddModal = true" class="flex items-center gap-2 px-6 py-3 bg-indigo-50 text-indigo-600 border border-indigo-100 rounded-2xl text-xs font-black uppercase tracking-widest shadow-sm hover:bg-indigo-100 transition-all active:scale-95">
                         <span class="material-symbols-outlined text-[18px]">add</span>
                         Add Expense
@@ -334,7 +334,7 @@ const statuses = ['Paid', 'Partial', 'Unpaid'];
                                 </div>
                             </td>
                             <td class="py-5 px-8 text-center whitespace-nowrap">
-                                <div class="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <div class="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity" v-if="$page.props.auth.user.role !== 'viewer'">
                                     <button @click="confirmDelete(expense.id)" class="w-8 h-8 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-rose-500 hover:border-rose-200 hover:bg-rose-50 transition-all shadow-sm">
                                         <span class="material-symbols-outlined text-[16px]">delete</span>
                                     </button>

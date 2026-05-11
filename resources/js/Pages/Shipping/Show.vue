@@ -173,7 +173,7 @@ const exportPDF = async () => {
                                 <p class="text-[10px] text-outline font-bold">Contents and Quantities</p>
                             </div>
                         </div>
-                        <button @click="showItemForm = true" class="w-8 h-8 rounded-lg bg-surface-container-low border border-outline-variant/30 flex items-center justify-center text-primary hover:bg-primary hover:text-on-primary transition-all">
+                        <button v-if="$page.props.auth.user.role !== 'viewer'" @click="showItemForm = true" class="w-8 h-8 rounded-lg bg-surface-container-low border border-outline-variant/30 flex items-center justify-center text-primary hover:bg-primary hover:text-on-primary transition-all">
                             <span class="material-symbols-outlined text-[18px]">add</span>
                         </button>
                     </div>
@@ -196,7 +196,7 @@ const exportPDF = async () => {
                                     <td class="py-6 px-6">
                                         <span class="px-4 py-1.5 rounded bg-surface-container-low text-sm font-black text-outline uppercase tracking-widest">{{ item.currency || 'USD' }}</span>
                                     </td>
-                                    <td class="py-4 px-6 text-right">
+                                    <td class="py-4 px-6 text-right" v-if="$page.props.auth.user.role !== 'viewer'">
                                         <button @click="deleteItem(item.id)" class="text-outline hover:text-error transition-colors">
                                             <span class="material-symbols-outlined text-[18px]">delete</span>
                                         </button>
@@ -222,7 +222,7 @@ const exportPDF = async () => {
                                 <p class="text-[10px] text-outline font-bold">Transaction History</p>
                             </div>
                         </div>
-                        <button @click="showPaymentForm = true" class="px-4 py-2 bg-emerald-600 text-on-primary text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-emerald-700 transition-colors">
+                        <button v-if="$page.props.auth.user.role !== 'viewer'" @click="showPaymentForm = true" class="px-4 py-2 bg-emerald-600 text-on-primary text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-emerald-700 transition-colors">
                             New Payment
                         </button>
                     </div>
@@ -241,7 +241,7 @@ const exportPDF = async () => {
                                     <td class="py-6 px-6 text-xl font-bold text-on-surface-variant">{{ fmtDate(pay.payment_date) }}</td>
                                     <td class="py-6 px-6 text-2xl font-black text-emerald-600">{{ formatCurrency(pay.amount) }}</td>
                                     <td class="py-6 px-6 text-sm font-bold text-outline uppercase">{{ pay.payment_method }}</td>
-                                    <td class="py-4 px-6 text-right">
+                                    <td class="py-4 px-6 text-right" v-if="$page.props.auth.user.role !== 'viewer'">
                                         <button @click="deletePayment(pay.id)" class="text-outline hover:text-error transition-colors">
                                             <span class="material-symbols-outlined text-[18px]">delete</span>
                                         </button>

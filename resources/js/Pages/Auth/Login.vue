@@ -6,7 +6,7 @@ import FormField from '@/Components/FormField.vue';
 import { ref } from 'vue';
 
 const form = useForm({
-    email: 'admin@admin.com',
+    email: '',
     password: '',
     remember: false,
 });
@@ -43,7 +43,7 @@ const submit = () => {
                     <TextInput
                         v-model="form.email"
                         type="email"
-                        placeholder="admin@admin.com"
+                        placeholder="email@example.com"
                         required
                         autofocus
                         autocomplete="username"

@@ -68,7 +68,7 @@ const doSearch = () => router.get('/shipping', { search: search.value, status: s
                 <h1 class="text-2xl font-headline font-bold text-on-surface tracking-tight">Logistics Overview</h1>
                 <p class="text-sm text-outline font-label">Container Tracking & Financials</p>
             </div>
-            <div class="flex items-center gap-3">
+            <div class="flex items-center gap-3" v-if="$page.props.auth.user.role !== 'viewer'">
                 <button @click="openAdd" class="bg-primary text-on-primary px-6 py-2.5 rounded-xl font-bold flex items-center gap-2 hover:bg-primary/90 transition-all active:scale-95 shadow-lg shadow-primary/20">
                     <span class="material-symbols-outlined text-[20px]">add_box</span>
                     New Shipment
@@ -150,12 +150,14 @@ const doSearch = () => router.get('/shipping', { search: search.value, status: s
                                     <Link :href="`/shipping/${s.id}`" class="p-1.5 text-outline hover:text-primary transition-colors">
                                         <span class="material-symbols-outlined text-[20px]">visibility</span>
                                     </Link>
-                                    <button @click="openEdit(s)" class="p-1.5 text-outline hover:text-orange-500 transition-colors">
-                                        <span class="material-symbols-outlined text-[20px]">edit</span>
-                                    </button>
-                                    <button @click="del(s.id)" class="p-1.5 text-outline hover:text-error transition-colors">
-                                        <span class="material-symbols-outlined text-[20px]">delete</span>
-                                    </button>
+                                    <template v-if="$page.props.auth.user.role !== 'viewer'">
+                                        <button @click="openEdit(s)" class="p-1.5 text-outline hover:text-orange-500 transition-colors">
+                                            <span class="material-symbols-outlined text-[20px]">edit</span>
+                                        </button>
+                                        <button @click="del(s.id)" class="p-1.5 text-outline hover:text-error transition-colors">
+                                            <span class="material-symbols-outlined text-[20px]">delete</span>
+                                        </button>
+                                    </template>
                                 </div>
                             </td>
                         </tr>

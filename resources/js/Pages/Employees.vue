@@ -92,7 +92,7 @@ const destroy = (id) => {
                         Customers
                     </button>
                 </div>
-                <PrimaryButton @click="openModal()" class="flex items-center gap-2">
+                <PrimaryButton v-if="$page.props.auth.user.role !== 'viewer'" @click="openModal()" class="flex items-center gap-2">
                     <span class="material-symbols-outlined text-[18px]">add</span>
                     Add {{ activeTab === 'employees' ? 'Employee' : 'Customer' }}
                 </PrimaryButton>
@@ -128,7 +128,7 @@ const destroy = (id) => {
                             </td>
                             <td class="px-6 py-6 text-sm text-outline">{{ emp.address || '-' }}</td>
                             <td class="px-6 py-4 text-right">
-                                <div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity" v-if="$page.props.auth.user.role !== 'viewer'">
                                     <button @click="openModal(emp)" class="p-1.5 text-outline hover:text-primary transition-colors"><span class="material-symbols-outlined text-[18px]">edit</span></button>
                                     <button @click="destroy(emp.id)" class="p-1.5 text-outline hover:text-error transition-colors"><span class="material-symbols-outlined text-[18px]">delete</span></button>
                                 </div>
@@ -175,7 +175,7 @@ const destroy = (id) => {
                             </td>
                             <td class="px-6 py-6 text-sm text-outline">{{ cust.address || '-' }}</td>
                             <td class="px-6 py-4 text-right">
-                                <div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity" v-if="$page.props.auth.user.role !== 'viewer'">
                                     <button @click="openModal(cust)" class="p-1.5 text-outline hover:text-primary transition-colors"><span class="material-symbols-outlined text-[18px]">edit</span></button>
                                     <button @click="destroy(cust.id)" class="p-1.5 text-outline hover:text-error transition-colors"><span class="material-symbols-outlined text-[18px]">delete</span></button>
                                 </div>

@@ -357,7 +357,7 @@ const statuses = [{label: 'All Status', value: 'all'}, {label: 'Paid', value: 'p
                     />
                 </div>
 
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-2" v-if="$page.props.auth.user.role !== 'viewer'">
                     <button @click="openModal()" class="flex items-center gap-2 px-6 py-3 bg-indigo-50 text-indigo-600 border border-indigo-100 rounded-2xl text-xs font-black uppercase tracking-widest shadow-sm hover:bg-indigo-100 transition-all active:scale-95">
                         <span class="material-symbols-outlined text-[18px]">add</span>
                         New Sale
@@ -405,15 +405,17 @@ const statuses = [{label: 'All Status', value: 'all'}, {label: 'Paid', value: 'p
                                     <button @click="openHistoryModal(sale)" class="w-8 h-8 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-100 hover:scale-110 transition-all shadow-sm" title="Payment History">
                                         <span class="material-symbols-outlined text-[16px]">history</span>
                                     </button>
-                                    <button @click="openPaymentModal(sale)" class="w-8 h-8 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 hover:bg-emerald-100 hover:scale-110 transition-all shadow-sm" title="Record Payment">
-                                        <span class="material-symbols-outlined text-[16px]">payments</span>
-                                    </button>
-                                    <button @click="openModal(sale)" class="w-8 h-8 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-indigo-500 hover:border-indigo-200 hover:bg-indigo-50 transition-all shadow-sm" title="Edit">
-                                        <span class="material-symbols-outlined text-[16px]">edit</span>
-                                    </button>
-                                    <button @click="confirmDelete(sale.id)" class="w-8 h-8 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-rose-500 hover:border-rose-200 hover:bg-rose-50 transition-all shadow-sm" title="Delete">
-                                        <span class="material-symbols-outlined text-[16px]">delete</span>
-                                    </button>
+                                    <template v-if="$page.props.auth.user.role !== 'viewer'">
+                                        <button @click="openPaymentModal(sale)" class="w-8 h-8 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 hover:bg-emerald-100 hover:scale-110 transition-all shadow-sm" title="Record Payment">
+                                            <span class="material-symbols-outlined text-[16px]">payments</span>
+                                        </button>
+                                        <button @click="openModal(sale)" class="w-8 h-8 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-indigo-500 hover:border-indigo-200 hover:bg-indigo-50 transition-all shadow-sm" title="Edit">
+                                            <span class="material-symbols-outlined text-[16px]">edit</span>
+                                        </button>
+                                        <button @click="confirmDelete(sale.id)" class="w-8 h-8 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-rose-500 hover:border-rose-200 hover:bg-rose-50 transition-all shadow-sm" title="Delete">
+                                            <span class="material-symbols-outlined text-[16px]">delete</span>
+                                        </button>
+                                    </template>
                                 </div>
                             </td>
                         </tr>

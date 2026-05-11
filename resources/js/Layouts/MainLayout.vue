@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, onUnmounted, watch } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { Link, usePage, router } from '@inertiajs/vue3';
 import axios from 'axios';
 
@@ -84,21 +84,30 @@ onUnmounted(() => {
     if (pollingInterval) clearInterval(pollingInterval);
 });
 
-const navItems = [
-    { name: 'Dashboard', icon: 'dashboard', href: '/dashboard' },
-    { name: 'Sales', icon: 'payments', href: '/sales' },
-    { name: 'EXP INV', icon: 'export_notes', href: '/sales?type=export' },
-    { name: 'Expenses', icon: 'receipt_long', href: '/expenses' },
-    { name: 'Staff & Clients', icon: 'badge', href: '/employees' },
-    { name: 'Inventory', icon: 'inventory_2', href: '/inventory' },
-    { name: 'Reminders', icon: 'notifications_active', href: '/reminders' },
-    { name: 'Notifications', icon: 'notifications', href: '/notifications' },
-    { name: 'Shipping Tool', icon: 'local_shipping', href: '/shipping' },
-    { name: 'Reports', icon: 'analytics', href: '/reports' },
-    { name: 'Banks', icon: 'account_balance', href: '/banks' },
-    { name: 'User Management', icon: 'group', href: '/users' },
-    { name: 'Activity Log', icon: 'history', href: '/activity-log' },
-];
+const navItems = computed(() => {
+    const baseItems = [
+        { name: 'Dashboard', icon: 'dashboard', href: '/dashboard' },
+        { name: 'Sales', icon: 'payments', href: '/sales' },
+        { name: 'EXP INV', icon: 'export_notes', href: '/sales?type=export' },
+        { name: 'Expenses', icon: 'receipt_long', href: '/expenses' },
+        { name: 'Staff & Clients', icon: 'badge', href: '/employees' },
+        { name: 'Inventory', icon: 'inventory_2', href: '/inventory' },
+        { name: 'Reminders', icon: 'notifications_active', href: '/reminders' },
+        { name: 'Notifications', icon: 'notifications', href: '/notifications' },
+        { name: 'Shipping Tool', icon: 'local_shipping', href: '/shipping' },
+        { name: 'Reports', icon: 'analytics', href: '/reports' },
+        { name: 'Banks', icon: 'account_balance', href: '/banks' },
+    ];
+
+    if (usePage().props.auth.user.role === 'admin') {
+        baseItems.push(
+            { name: 'User Management', icon: 'group', href: '/users' },
+            { name: 'Activity Log', icon: 'history', href: '/activity-log' }
+        );
+    }
+
+    return baseItems;
+});
 
 const page = usePage();
 </script>

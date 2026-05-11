@@ -15,6 +15,11 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(append: [
             \App\Http\Middleware\HandleInertiaRequests::class,
         ]);
+
+        $middleware->alias([
+            'restrict.viewer' => \App\Http\Middleware\RestrictViewerActions::class,
+            'admin.only' => \App\Http\Middleware\AdminOnly::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //
