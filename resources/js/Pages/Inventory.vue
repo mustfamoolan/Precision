@@ -291,6 +291,11 @@ const getBrandName = (id) => {
                     </button>
                 </div>
                 
+                <PrimaryButton v-if="activeTab === 'inventory' && $page.props.auth.user.role !== 'viewer'" @click="showBrandModal = true" class="!bg-emerald-600 h-[46px] px-6 rounded-2xl shadow-lg shadow-emerald-100 flex items-center gap-2">
+                    <span class="material-symbols-outlined text-[18px]">add_circle</span>
+                    Add Brand
+                </PrimaryButton>
+
                 <PrimaryButton v-if="activeTab === 'inventory' && $page.props.auth.user.role !== 'viewer'" @click="openAddModal" class="!bg-indigo-600 h-[46px] px-6 rounded-2xl shadow-lg shadow-indigo-100 flex items-center gap-2">
                     <span class="material-symbols-outlined text-[18px]">add_circle</span>
                     Add Product
