@@ -23,6 +23,15 @@ const statusFilter = ref(props.filters?.status || '');
 const isModalOpen = ref(false);
 const editingReminder = ref(null);
 
+const form = useForm({
+    date: '',
+    item: '',
+    quantity: '',
+    unit: '',
+    notes: '',
+    status: 'pending',
+});
+
 const handleFilter = () => {
     router.get('/reminders', {
         search: search.value,
@@ -93,6 +102,22 @@ const getStatusIcon = (status) => {
 const formatDate = (dateString) => {
     if (!dateString) return '—';
     return new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+};
+
+const isOverdue = (dateString, status) => {
+    if (status === 'done') return false;
+    if (!dateString) return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const dueDate = new Date(dateString);
+    dueDate.setHours(0, 0, 0, 0);
+    return dueDate < today;
+};
+
+const markAsDone = (id) => {
+    router.put(`/reminders/${id}`, {
+        status: 'done'
+    }, { preserveState: true, preserveScroll: true });
 };
 
 // Compute KPI
@@ -192,7 +217,13 @@ const completedCount = computed(() => props.kpi.done);
                     <tbody class="divide-y divide-outline-variant/10">
                         <tr v-for="r in reminders.data" :key="r.id" class="group hover:bg-surface-container-low/50 transition-colors">
                             <td class="py-6 px-6">
-                                <div class="text-xl font-bold text-on-surface whitespace-nowrap">{{ formatDate(r.date) }}</div>
+                                <div class="flex flex-col gap-1">
+                                    <div class="text-xl font-bold text-on-surface whitespace-nowrap">{{ formatDate(r.date) }}</div>
+                                    <div v-if="isOverdue(r.date, r.status)" class="inline-flex items-center gap-1 text-[10px] font-black text-rose-600 bg-rose-50 border border-rose-100 rounded px-1.5 py-0.5 w-max uppercase tracking-wider">
+                                        <span class="material-symbols-outlined text-[12px] font-bold">warning</span>
+                                        Overdue
+                                    </div>
+                                </div>
                             </td>
                             <td class="py-6 px-6">
                                 <div class="text-2xl font-bold text-on-surface">{{ r.item }}</div>
@@ -214,13 +245,25 @@ const completedCount = computed(() => props.kpi.done);
                                 </div>
                             </td>
                             <td class="py-5 px-6 text-right">
-                                <div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity" v-if="$page.props.auth.user.role !== 'viewer'">
-                                    <button @click="openModal(r)" class="p-1.5 text-outline hover:text-primary transition-colors">
-                                        <span class="material-symbols-outlined text-[20px]">edit</span>
+                                <div class="flex items-center justify-end gap-2">
+                                    <button 
+                                        v-if="r.status !== 'done' && $page.props.auth.user.role !== 'viewer'"
+                                        @click="markAsDone(r.id)" 
+                                        class="inline-flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-black text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 hover:border-emerald-300 transition-all active:scale-95 uppercase tracking-wider"
+                                        title="Mark Completed"
+                                    >
+                                        <span class="material-symbols-outlined text-[14px]">check</span>
+                                        Done
                                     </button>
-                                    <button @click="destroy(r.id)" class="p-1.5 text-outline hover:text-error transition-colors">
-                                        <span class="material-symbols-outlined text-[20px]">delete</span>
-                                    </button>
+                                    
+                                    <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity" v-if="$page.props.auth.user.role !== 'viewer'">
+                                        <button @click="openModal(r)" class="p-1.5 text-outline hover:text-primary transition-colors" title="Edit">
+                                            <span class="material-symbols-outlined text-[20px]">edit</span>
+                                        </button>
+                                        <button @click="destroy(r.id)" class="p-1.5 text-outline hover:text-error transition-colors" title="Delete">
+                                            <span class="material-symbols-outlined text-[20px]">delete</span>
+                                        </button>
+                                    </div>
                                 </div>
                             </td>
                         </tr>
