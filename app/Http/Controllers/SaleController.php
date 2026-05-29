@@ -72,7 +72,7 @@ class SaleController extends Controller
             ]),
             'banks' => Bank::all(['id', 'name']),
             'customers' => \App\Models\Customer::orderBy('name')->get(['id', 'name', 'address']),
-            'inventory' => \App\Models\Inventory::all(['id', 'name', 'sku', 'selling_price']),
+            'inventory' => \App\Models\Inventory::with('brand:id,name')->get(['id', 'name', 'sku', 'selling_price', 'brand_id']),
         ]);
     }
 
@@ -114,13 +114,22 @@ class SaleController extends Controller
         }
 
         $sale = \App\Models\Sale::withoutEvents(function () use ($validated) {
-            // Safeguard: Ensure names are populated for items if missing
+            // Safeguard: Ensure names and brand names are populated for items if missing
             if (!empty($validated['items'])) {
                 foreach ($validated['items'] as &$item) {
+                    $inv = null;
                     if (empty($item['name']) && !empty($item['inventory_id'])) {
-                        $inv = \App\Models\Inventory::find($item['inventory_id']);
+                        $inv = \App\Models\Inventory::with('brand')->find($item['inventory_id']);
                         if ($inv) {
                             $item['name'] = $inv->name;
+                        }
+                    }
+                    if (empty($item['brand_name']) && !empty($item['inventory_id'])) {
+                        if (!$inv) {
+                            $inv = \App\Models\Inventory::with('brand')->find($item['inventory_id']);
+                        }
+                        if ($inv && $inv->brand) {
+                            $item['brand_name'] = $inv->brand->name;
                         }
                     }
                 }
@@ -199,13 +208,22 @@ class SaleController extends Controller
             $validated['status'] = 'pending';
         }
 
-        // Safeguard: Ensure names are populated for items if missing
+        // Safeguard: Ensure names and brand names are populated for items if missing
         if (!empty($validated['items'])) {
             foreach ($validated['items'] as &$item) {
+                $inv = null;
                 if (empty($item['name']) && !empty($item['inventory_id'])) {
-                    $inv = \App\Models\Inventory::find($item['inventory_id']);
+                    $inv = \App\Models\Inventory::with('brand')->find($item['inventory_id']);
                     if ($inv) {
                         $item['name'] = $inv->name;
+                    }
+                }
+                if (empty($item['brand_name']) && !empty($item['inventory_id'])) {
+                    if (!$inv) {
+                        $inv = \App\Models\Inventory::with('brand')->find($item['inventory_id']);
+                    }
+                    if ($inv && $inv->brand) {
+                        $item['brand_name'] = $inv->brand->name;
                     }
                 }
             }

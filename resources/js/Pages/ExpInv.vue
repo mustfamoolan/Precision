@@ -88,7 +88,16 @@ const openHistoryModal = (sale) => {
 };
 
 const openItemsModal = (sale) => {
-    itemsSale.value = sale;
+    const items = (sale.items || []).map(item => {
+        if (!item.brand_name && item.inventory_id) {
+            const inv = props.inventory.find(i => i.id == item.inventory_id);
+            if (inv && inv.brand) {
+                return { ...item, brand_name: inv.brand.name };
+            }
+        }
+        return item;
+    });
+    itemsSale.value = { ...sale, items };
     showItemsModal.value = true;
 };
 
@@ -104,7 +113,15 @@ const openEditModal = (sale) => {
     form.container_number = sale.container_number ? sale.container_number.replace('CN-', '') : '';
     form.shipping_status = sale.shipping_status;
     form.bank_id = sale.bank_id || '';
-    form.items = sale.items || [];
+    form.items = (sale.items || []).map(item => {
+        if (!item.brand_name && item.inventory_id) {
+            const inv = props.inventory.find(i => i.id == item.inventory_id);
+            if (inv && inv.brand) {
+                return { ...item, brand_name: inv.brand.name };
+            }
+        }
+        return item;
+    });
     form.customer_address = sale.customer_address || '';
     form.has_tax = sale.has_tax !== undefined ? !!sale.has_tax : true;
     form.currency = sale.currency || 'AED';
@@ -125,6 +142,7 @@ const onInventorySelect = (index, invId) => {
     const inv = props.inventory.find(i => i.id == invId);
     if (inv) {
         form.items[index].name = inv.name;
+        form.items[index].brand_name = inv.brand ? inv.brand.name : '';
         form.items[index].rate = inv.selling_price || 0;
     }
 };
@@ -217,6 +235,15 @@ const shippingStatuses = ['On Board', 'In Transit', 'Delivered'];
 const statuses = [{label: 'All Status', value: 'all'}, {label: 'Paid', value: 'paid'}, {label: 'Partial', value: 'partial'}, {label: 'Pending', value: 'pending'}];
 
 const exportInvoicePDF = async (sale) => {
+    const items = (sale.items || []).map(item => {
+        if (!item.brand_name && item.inventory_id) {
+            const inv = props.inventory.find(i => i.id == item.inventory_id);
+            if (inv && inv.brand) {
+                return { ...item, brand_name: inv.brand.name };
+            }
+        }
+        return item;
+    });
     const loadImgBase64 = (src) => new Promise((resolve) => {
         const img = new Image();
         img.crossOrigin = 'Anonymous';
@@ -463,7 +490,7 @@ const exportInvoicePDF = async (sale) => {
     let subtotal = 0;
     let totalVat = 0;
 
-    const itemsCount = sale.items ? sale.items.length : 0;
+    const itemsCount = items ? items.length : 0;
     const totalRows = Math.max(10, itemsCount);
 
     if (itemsCount === 0) {
@@ -482,7 +509,7 @@ const exportInvoicePDF = async (sale) => {
             doc.setFontSize(9);
             doc.text(String(i + 1), 20, currentY);
 
-            const item = sale.items[i];
+            const item = items[i];
             const qty = parseFloat(item.quantity || 0);
             const rate = parseFloat(item.rate || 0);
             const lineTotal = qty * rate;
@@ -491,13 +518,15 @@ const exportInvoicePDF = async (sale) => {
             totalVat += lineVat;
 
             const itemName = item.name || 'Product Item';
-            if (/[\u0600-\u06FF]/.test(itemName)) {
-                renderArabic(itemName, 30, currentY, 9, '#1e293b', 'left', true);
+            const brandStr = item.brand_name ? ` (${item.brand_name})` : '';
+            const displayName = itemName + brandStr;
+            if (/[\u0600-\u06FF]/.test(displayName)) {
+                renderArabic(displayName, 30, currentY, 9, '#1e293b', 'left', true);
             } else {
                 setTextColor(colorDark);
                 doc.setFont('helvetica', 'bold');
                 doc.setFontSize(9);
-                doc.text(itemName, 30, currentY);
+                doc.text(displayName, 30, currentY);
             }
 
             setTextColor(colorDark);
@@ -922,7 +951,7 @@ const exportInvoicePDF = async (sale) => {
                                 <label class="text-[9px] font-black text-slate-400 uppercase mb-1 block">Product</label>
                                 <SelectInput 
                                     v-model="item.inventory_id" 
-                                    :options="inventory.map(i => ({ label: `${i.name} (${i.sku})`, value: i.id }))"
+                                    :options="inventory.map(i => ({ label: `${i.name}` + (i.sku ? ` (${i.sku})` : '') + (i.brand ? ` - ${i.brand.name}` : ''), value: i.id }))"
                                     @update:modelValue="(val) => onInventorySelect(index, val)"
                                     placeholder="Choose Product..."
                                 />
@@ -1106,9 +1135,12 @@ const exportInvoicePDF = async (sale) => {
                                     
                                     <div>
                                         <h5 class="text-lg font-black text-slate-900 leading-tight">{{ item.name || 'Unknown Product' }}</h5>
-                                        <div class="flex items-center gap-2 mt-1">
+                                        <div class="flex flex-wrap items-center gap-2 mt-1">
                                             <span class="px-2 py-0.5 bg-slate-100 text-slate-500 rounded text-[9px] font-bold uppercase tracking-widest">
                                                 ID: #{{ item.inventory_id }}
+                                            </span>
+                                            <span v-if="item.brand_name" class="px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded text-[9px] font-bold uppercase tracking-widest">
+                                                Brand: {{ item.brand_name }}
                                             </span>
                                             <span class="w-1 h-1 bg-slate-300 rounded-full"></span>
                                             <p class="text-[11px] font-bold text-indigo-600 uppercase tracking-widest">Qty: {{ item.quantity }}</p>
