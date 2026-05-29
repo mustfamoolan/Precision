@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 import MainLayout from '@/Layouts/MainLayout.vue';
 import { Head, useForm, router } from '@inertiajs/vue3';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
@@ -72,6 +72,36 @@ const roles = [
 const formatDate = (date) => {
     return new Date(date).toLocaleDateString('en-AE', { year: 'numeric', month: 'short', day: 'numeric' });
 };
+
+const isOnline = (lastSeen) => {
+    if (!lastSeen) return false;
+    const diff = new Date() - new Date(lastSeen);
+    return diff < 2 * 60 * 1000; // 2 minutes threshold
+};
+
+const getLastSeenText = (lastSeen) => {
+    if (!lastSeen) return 'Never active';
+    const diffMs = new Date() - new Date(lastSeen);
+    const diffMins = Math.floor(diffMs / (60 * 1000));
+    const diffHrs = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHrs / 24);
+
+    if (diffMins < 1) return 'Active just now';
+    if (diffMins < 60) return `Last seen ${diffMins}m ago`;
+    if (diffHrs < 24) return `Last seen ${diffHrs}h ago`;
+    return `Last seen ${diffDays}d ago`;
+};
+
+let reloadInterval = null;
+onMounted(() => {
+    reloadInterval = setInterval(() => {
+        router.reload({ only: ['users'], preserveScroll: true, preserveState: true });
+    }, 5000);
+});
+
+onUnmounted(() => {
+    if (reloadInterval) clearInterval(reloadInterval);
+});
 </script>
 
 <template>
@@ -116,12 +146,22 @@ const formatDate = (date) => {
                         <tr v-for="user in users" :key="user.id" class="hover:bg-surface-container-low/30 transition-colors group">
                             <td class="px-6 py-6">
                                 <div class="flex items-center gap-3">
-                                    <div class="w-10 h-10 rounded-full bg-surface-container-high border border-outline-variant/20 flex items-center justify-center overflow-hidden">
+                                    <div class="relative w-10 h-10 rounded-full bg-surface-container-high border border-outline-variant/20 flex items-center justify-center overflow-hidden">
                                         <img :src="'https://ui-avatars.com/api/?name='+user.name+'&background=004ced&color=fff'" alt="Avatar" class="w-full h-full object-cover">
+                                        <!-- Status Indicator Dot -->
+                                        <span class="absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full ring-2 ring-white"
+                                            :class="isOnline(user.last_seen) ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'"
+                                        ></span>
                                     </div>
                                     <div class="flex flex-col">
-                                        <span class="text-lg font-bold text-on-surface">{{ user.name }}</span>
+                                        <div class="flex items-center gap-2">
+                                            <span class="text-lg font-bold text-on-surface">{{ user.name }}</span>
+                                            <span v-if="user.id === $page.props.auth?.user?.id" class="text-[9px] bg-slate-100 text-slate-500 font-bold px-1.5 py-0.5 rounded">You</span>
+                                        </div>
                                         <span class="text-xs text-outline font-medium">{{ user.email }}</span>
+                                        <span class="text-[10px] mt-0.5 font-medium" :class="isOnline(user.last_seen) ? 'text-emerald-600 font-bold' : 'text-slate-400'">
+                                            {{ isOnline(user.last_seen) ? 'Active now' : getLastSeenText(user.last_seen) }}
+                                        </span>
                                     </div>
                                 </div>
                             </td>
