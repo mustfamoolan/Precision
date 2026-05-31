@@ -32,6 +32,7 @@ const isExpenseModalOpen = ref(false);
 const isReceiveModalOpen = ref(false);
 const isAdjustmentModalOpen = ref(false);
 const isAddBankModalOpen = ref(false);
+const isTransferModalOpen = ref(false);
 const selectedCheque = ref(null);
 
 // Filters
@@ -82,6 +83,14 @@ const adjustmentForm = useForm({
     date: new Date().toISOString().substr(0, 10),
 });
 
+const transferForm = useForm({
+    from_bank_id: '',
+    to_bank_id: '',
+    amount: '',
+    description: '',
+    date: new Date().toISOString().substr(0, 10),
+});
+
 const bankForm = useForm({
     name: '',
     balance: 0,
@@ -100,6 +109,11 @@ const openAddBankModal = () => {
     isAddBankModalOpen.value = true;
 };
 
+const openTransferModal = () => {
+    transferForm.reset();
+    isTransferModalOpen.value = true;
+};
+
 const submitAdjustment = () => {
     adjustmentForm.post('/banks/adjust', {
         onSuccess: () => {
@@ -112,6 +126,14 @@ const submitBank = () => {
     bankForm.post('/banks', {
         onSuccess: () => {
             isAddBankModalOpen.value = false;
+        }
+    });
+};
+
+const submitTransfer = () => {
+    transferForm.post('/banks/transfer', {
+        onSuccess: () => {
+            isTransferModalOpen.value = false;
         }
     });
 };
@@ -147,6 +169,13 @@ const formatPrice = (amount) => new Intl.NumberFormat('en-AE', { style: 'currenc
                 >
                     <span class="material-symbols-outlined text-xl">add_business</span>
                     New Account
+                </button>
+                <button 
+                    @click="openTransferModal"
+                    class="bg-white text-slate-700 px-6 py-3 rounded-2xl font-bold border border-slate-200 shadow-sm hover:bg-slate-50 transition-all flex items-center gap-2 active:scale-95"
+                >
+                    <span class="material-symbols-outlined text-xl">sync_alt</span>
+                    Transfer Funds
                 </button>
                 <button 
                     @click="isChequeModalOpen = true"
@@ -479,6 +508,37 @@ const formatPrice = (amount) => new Intl.NumberFormat('en-AE', { style: 'currenc
                 <div class="pt-6 flex justify-end gap-3 border-t">
                     <SecondaryButton @click="isReceiveModalOpen = false" type="button">Cancel</SecondaryButton>
                     <PrimaryButton :loading="receiveForm.processing" class="!bg-emerald-600">Receive into Bank</PrimaryButton>
+                </div>
+            </form>
+        </SideModal>
+
+        <!-- Fund Transfer Modal -->
+        <SideModal :show="isTransferModalOpen" title="Transfer Funds" @close="isTransferModalOpen = false">
+            <form @submit.prevent="submitTransfer" class="space-y-6 p-2">
+                <FormField label="Source Account" required :error="transferForm.errors.from_bank_id">
+                    <SelectInput v-model="transferForm.from_bank_id" :options="banks.map(b => ({label: b.name + ' (' + formatPrice(b.balance) + ')', value: b.id}))" />
+                </FormField>
+
+                <FormField label="Destination Account" required :error="transferForm.errors.to_bank_id">
+                    <SelectInput v-model="transferForm.to_bank_id" :options="banks.filter(b => b.id !== transferForm.from_bank_id).map(b => ({label: b.name + ' (' + formatPrice(b.balance) + ')', value: b.id}))" />
+                </FormField>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <FormField label="Amount (AED)" required :error="transferForm.errors.amount">
+                        <TextInput v-model="transferForm.amount" type="number" step="0.01" />
+                    </FormField>
+                    <FormField label="Date" required :error="transferForm.errors.date">
+                        <TextInput v-model="transferForm.date" type="date" />
+                    </FormField>
+                </div>
+
+                <FormField label="Description / Reason" :error="transferForm.errors.description">
+                    <TextArea v-model="transferForm.description" placeholder="e.g. Bank to Cash transfer, Cash deposit..." />
+                </FormField>
+
+                <div class="pt-6 flex justify-end gap-3 border-t">
+                    <SecondaryButton @click="isTransferModalOpen = false" type="button">Cancel</SecondaryButton>
+                    <PrimaryButton :loading="transferForm.processing" class="!bg-indigo-600">Transfer Funds</PrimaryButton>
                 </div>
             </form>
         </SideModal>

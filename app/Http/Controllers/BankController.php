@@ -187,6 +187,64 @@ class BankController extends Controller
     }
 
     /**
+     * Transfer funds between bank accounts/cash.
+     */
+    public function transfer(Request $request)
+    {
+        $validated = $request->validate([
+            'from_bank_id' => 'required|exists:banks,id',
+            'to_bank_id' => 'required|exists:banks,id|different:from_bank_id',
+            'amount' => 'required|numeric|min:0.01',
+            'description' => 'nullable|string|max:255',
+            'date' => 'required|date',
+        ]);
+
+        return DB::transaction(function () use ($validated) {
+            $fromBank = Bank::lockForUpdate()->find($validated['from_bank_id']);
+            $toBank = Bank::lockForUpdate()->find($validated['to_bank_id']);
+
+            if ($fromBank->balance < $validated['amount']) {
+                return redirect()->back()->withErrors(['amount' => 'Insufficient funds in ' . $fromBank->name]);
+            }
+
+            $description = $validated['description'] ?? "Transfer from {$fromBank->name} to {$toBank->name}";
+
+            // 1. Create withdrawal from source bank
+            BankTransaction::create([
+                'bank_id' => $fromBank->id,
+                'amount' => $validated['amount'],
+                'type' => 'withdrawal',
+                'reference_type' => 'Transfer Out',
+                'description' => $description,
+                'date' => $validated['date'],
+            ]);
+
+            // 2. Create deposit to destination bank
+            BankTransaction::create([
+                'bank_id' => $toBank->id,
+                'amount' => $validated['amount'],
+                'type' => 'deposit',
+                'reference_type' => 'Transfer In',
+                'description' => $description,
+                'date' => $validated['date'],
+            ]);
+
+            // 3. Update Balances
+            $fromBank->decrement('balance', $validated['amount']);
+            $toBank->increment('balance', $validated['amount']);
+
+            // 4. Log Activity
+            \App\Services\ActivityLogger::log(
+                'updated',
+                "Transferred " . number_format($validated['amount'], 2) . " AED from {$fromBank->name} to {$toBank->name}",
+                $fromBank
+            );
+
+            return redirect()->back()->with('success', 'Funds transferred successfully.');
+        });
+    }
+
+    /**
      * Delete a bank account.
      */
     public function destroy(Bank $bank)
