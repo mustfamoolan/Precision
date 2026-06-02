@@ -66,7 +66,10 @@ router.on('navigate', () => {
     fetchNotifications();
 });
 
+import { initPresence, disconnectPresence } from '@/presence';
+
 onMounted(() => {
+    initPresence();
     const savedTheme = localStorage.getItem('theme');
     if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
         isDarkMode.value = true;
@@ -82,6 +85,7 @@ onMounted(() => {
 
 onUnmounted(() => {
     if (pollingInterval) clearInterval(pollingInterval);
+    disconnectPresence();
 });
 
 const navItems = computed(() => {

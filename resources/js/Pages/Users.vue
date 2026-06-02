@@ -8,6 +8,7 @@ import SideModal from '@/Components/SideModal.vue';
 import FormField from '@/Components/FormField.vue';
 import TextInput from '@/Components/TextInput.vue';
 import SelectInput from '@/Components/SelectInput.vue';
+import { onlineUsers, offlineTimes } from '@/presence';
 
 defineOptions({ layout: MainLayout });
 
@@ -73,13 +74,14 @@ const formatDate = (date) => {
     return new Date(date).toLocaleDateString('en-AE', { year: 'numeric', month: 'short', day: 'numeric' });
 };
 
-const isOnline = (lastSeen) => {
-    if (!lastSeen) return false;
-    const diff = new Date() - new Date(lastSeen);
-    return diff < 2 * 60 * 1000; // 2 minutes threshold
+const isOnline = (user) => {
+    return onlineUsers.value.has(user.id);
 };
 
-const getLastSeenText = (lastSeen) => {
+const getLastSeenText = (user) => {
+    const dynamicLastSeen = offlineTimes.value.get(user.id);
+    const lastSeen = dynamicLastSeen || user.last_seen;
+
     if (!lastSeen) return 'Never active';
     const diffMs = new Date() - new Date(lastSeen);
     const diffMins = Math.floor(diffMs / (60 * 1000));
@@ -91,17 +93,6 @@ const getLastSeenText = (lastSeen) => {
     if (diffHrs < 24) return `Last seen ${diffHrs}h ago`;
     return `Last seen ${diffDays}d ago`;
 };
-
-let reloadInterval = null;
-onMounted(() => {
-    reloadInterval = setInterval(() => {
-        router.reload({ only: ['users'], preserveScroll: true, preserveState: true });
-    }, 5000);
-});
-
-onUnmounted(() => {
-    if (reloadInterval) clearInterval(reloadInterval);
-});
 </script>
 
 <template>
@@ -150,7 +141,7 @@ onUnmounted(() => {
                                         <img :src="'https://ui-avatars.com/api/?name='+user.name+'&background=004ced&color=fff'" alt="Avatar" class="w-full h-full object-cover">
                                         <!-- Status Indicator Dot -->
                                         <span class="absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full ring-2 ring-white"
-                                            :class="isOnline(user.last_seen) ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'"
+                                            :class="isOnline(user) ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'"
                                         ></span>
                                     </div>
                                     <div class="flex flex-col">
@@ -159,8 +150,8 @@ onUnmounted(() => {
                                             <span v-if="user.id === $page.props.auth?.user?.id" class="text-[9px] bg-slate-100 text-slate-500 font-bold px-1.5 py-0.5 rounded">You</span>
                                         </div>
                                         <span class="text-xs text-outline font-medium">{{ user.email }}</span>
-                                        <span class="text-[10px] mt-0.5 font-medium" :class="isOnline(user.last_seen) ? 'text-emerald-600 font-bold' : 'text-slate-400'">
-                                            {{ isOnline(user.last_seen) ? 'Active now' : getLastSeenText(user.last_seen) }}
+                                        <span class="text-[10px] mt-0.5 font-medium" :class="isOnline(user) ? 'text-emerald-600 font-bold' : 'text-slate-400'">
+                                            {{ isOnline(user) ? 'Active now' : getLastSeenText(user) }}
                                         </span>
                                     </div>
                                 </div>

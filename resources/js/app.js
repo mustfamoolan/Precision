@@ -1,3 +1,4 @@
+import './echo';
 import '../css/app.css';
 import '@fontsource/manrope/400.css';
 import '@fontsource/manrope/600.css';

@@ -44,6 +44,13 @@ class LoginController extends Controller
      */
     public function destroy(Request $request)
     {
+        if (Auth::check()) {
+            $user = Auth::user();
+            $user->timestamps = false;
+            $user->last_seen = now();
+            $user->save();
+        }
+        
         Auth::logout();
 
         $request->session()->invalidate();
