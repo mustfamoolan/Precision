@@ -118,6 +118,7 @@ const submitAdjustment = () => {
     adjustmentForm.post('/banks/adjust', {
         onSuccess: () => {
             isAdjustmentModalOpen.value = false;
+            adjustmentForm.reset();
         }
     });
 };
@@ -126,6 +127,7 @@ const submitBank = () => {
     bankForm.post('/banks', {
         onSuccess: () => {
             isAddBankModalOpen.value = false;
+            bankForm.reset();
         }
     });
 };
@@ -134,13 +136,14 @@ const submitTransfer = () => {
     transferForm.post('/banks/transfer', {
         onSuccess: () => {
             isTransferModalOpen.value = false;
+            transferForm.reset();
         }
     });
 };
 
-const submitCheque = () => chequeForm.post('/cheques', { onSuccess: () => isChequeModalOpen.value = false });
-const submitBankExpense = () => bankExpenseForm.post('/banks/expense', { onSuccess: () => isExpenseModalOpen.value = false });
-const submitReceive = () => receiveForm.post(`/cheques/${selectedCheque.value.id}/receive`, { onSuccess: () => isReceiveModalOpen.value = false });
+const submitCheque = () => chequeForm.post('/cheques', { onSuccess: () => { isChequeModalOpen.value = false; chequeForm.reset(); } });
+const submitBankExpense = () => bankExpenseForm.post('/banks/expense', { onSuccess: () => { isExpenseModalOpen.value = false; bankExpenseForm.reset(); } });
+const submitReceive = () => receiveForm.post(`/cheques/${selectedCheque.value.id}/receive`, { onSuccess: () => { isReceiveModalOpen.value = false; receiveForm.reset(); } });
 const submitClear = (chequeId) => {
     if (confirm('Are you sure you want to mark this cheque as cleared? This will update your bank balance.')) {
         router.post(`/cheques/${chequeId}/clear`);
