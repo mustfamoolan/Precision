@@ -249,19 +249,55 @@ class BankController extends Controller
      */
     public function history(Request $request, Bank $bank)
     {
-        $query = BankTransaction::where('bank_id', $bank->id)->latest('date')->latest('id');
+        // Fetch ALL transactions chronologically to calculate accurate running balances
+        $allTransactions = BankTransaction::where('bank_id', $bank->id)
+            ->orderBy('date', 'asc')
+            ->orderBy('id', 'asc')
+            ->get();
 
-        if ($request->date_from) {
-            $query->where('date', '>=', $request->date_from);
+        $runningBalance = 0;
+        $processedTransactions = [];
+
+        foreach ($allTransactions as $tx) {
+            $amount = (float)$tx->amount;
+            $balanceBefore = $runningBalance;
+
+            if ($tx->type === 'deposit') {
+                $balanceAfter = $runningBalance + $amount;
+            } else {
+                $balanceAfter = $runningBalance - $amount;
+            }
+
+            $tx->balance_before = $balanceBefore;
+            $tx->balance_after = $balanceAfter;
+
+            $runningBalance = $balanceAfter;
+
+            // Apply date filters if set
+            $keep = true;
+            if ($request->date_from && $tx->date < $request->date_from) {
+                $keep = false;
+            }
+            if ($request->date_to && $tx->date > $request->date_to) {
+                $keep = false;
+            }
+
+            if ($keep) {
+                $processedTransactions[] = $tx;
+            }
         }
 
-        if ($request->date_to) {
-            $query->where('date', '<=', $request->date_to);
-        }
+        // Return the transactions in latest first order for display
+        usort($processedTransactions, function ($a, $b) {
+            if ($a->date === $b->date) {
+                return $b->id <=> $a->id; // Latest ID first if dates are equal
+            }
+            return strcmp($b->date, $a->date); // Latest date first
+        });
 
         return response()->json([
             'bank' => $bank,
-            'transactions' => $query->get()
+            'transactions' => $processedTransactions
         ]);
     }
 

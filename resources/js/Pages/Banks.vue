@@ -628,25 +628,46 @@ const formatPrice = (amount) => new Intl.NumberFormat('en-AE', { style: 'currenc
                         Loading transactions...
                     </div>
 
-                    <div v-else class="space-y-4 max-h-[400px] overflow-y-auto pr-1">
-                        <div v-for="tx in historyTransactions" :key="tx.id" class="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between hover:bg-slate-100/50 transition-colors">
-                            <div>
-                                <p class="text-sm font-black text-slate-900">{{ tx.description }}</p>
-                                <div class="flex items-center gap-2 mt-1">
-                                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{{ tx.reference_type }}</span>
-                                    <span class="text-[10px] text-slate-300">•</span>
-                                    <span class="text-[10px] font-bold text-slate-400">{{ formatDate(tx.date) }}</span>
-                                </div>
-                            </div>
-                            <span :class="tx.type === 'deposit' ? 'text-emerald-600' : 'text-rose-600'" class="text-lg font-black whitespace-nowrap">
-                                {{ tx.type === 'deposit' ? '+' : '-' }} {{ formatPrice(tx.amount) }}
-                            </span>
-                        </div>
-
-                        <div v-if="historyTransactions.length === 0" class="py-12 text-center text-slate-400 italic text-sm">
-                            <span class="material-symbols-outlined text-4xl block mb-2 opacity-50">receipt_long</span>
-                            No transactions recorded for this period.
-                        </div>
+                    <div v-else class="overflow-x-auto max-h-[400px] border border-slate-100 rounded-2xl">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
+                                    <th class="py-3 px-4">Date</th>
+                                    <th class="py-3 px-4">Details</th>
+                                    <th class="py-3 px-4">Change</th>
+                                    <th class="py-3 px-4">Before</th>
+                                    <th class="py-3 px-4">After</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-50">
+                                <tr v-for="tx in historyTransactions" :key="tx.id" class="hover:bg-slate-50/50 transition-colors">
+                                    <td class="py-4 px-4 text-xs font-bold text-slate-900 whitespace-nowrap">
+                                        {{ formatDate(tx.date) }}
+                                    </td>
+                                    <td class="py-4 px-4">
+                                        <p class="text-xs font-bold text-slate-900">{{ tx.description }}</p>
+                                        <span class="text-[9px] font-black text-indigo-500 uppercase tracking-widest">{{ tx.reference_type }}</span>
+                                    </td>
+                                    <td class="py-4 px-4 whitespace-nowrap">
+                                        <span :class="tx.type === 'deposit' ? 'text-emerald-600' : 'text-rose-600'" class="text-xs font-black">
+                                            {{ tx.type === 'deposit' ? '+' : '-' }}{{ formatPrice(tx.amount) }}
+                                        </span>
+                                    </td>
+                                    <td class="py-4 px-4 text-xs font-medium text-slate-500 whitespace-nowrap">
+                                        {{ formatPrice(tx.balance_before) }}
+                                    </td>
+                                    <td class="py-4 px-4 text-xs font-bold text-slate-900 whitespace-nowrap">
+                                        {{ formatPrice(tx.balance_after) }}
+                                    </td>
+                                </tr>
+                                <tr v-if="historyTransactions.length === 0">
+                                    <td colspan="5" class="py-12 text-center text-slate-400 italic text-xs">
+                                        <span class="material-symbols-outlined text-3xl block mb-1 opacity-50">receipt_long</span>
+                                        No transactions recorded for this period.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
 
