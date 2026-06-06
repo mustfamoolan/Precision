@@ -245,6 +245,27 @@ class BankController extends Controller
     }
 
     /**
+     * Get history for a specific bank.
+     */
+    public function history(Request $request, Bank $bank)
+    {
+        $query = BankTransaction::where('bank_id', $bank->id)->latest('date')->latest('id');
+
+        if ($request->date_from) {
+            $query->where('date', '>=', $request->date_from);
+        }
+
+        if ($request->date_to) {
+            $query->where('date', '<=', $request->date_to);
+        }
+
+        return response()->json([
+            'bank' => $bank,
+            'transactions' => $query->get()
+        ]);
+    }
+
+    /**
      * Delete a bank account.
      */
     public function destroy(Bank $bank)

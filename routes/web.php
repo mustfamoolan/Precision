@@ -80,6 +80,7 @@ Route::middleware(['auth', 'restrict.viewer'])->group(function () {
     Route::post('/banks/adjust', [\App\Http\Controllers\BankController::class, 'adjustBalance']);
     Route::post('/banks/expense', [\App\Http\Controllers\BankController::class, 'storeExpense']);
     Route::post('/banks/transfer', [\App\Http\Controllers\BankController::class, 'transfer']);
+    Route::get('/banks/{bank}/history', [\App\Http\Controllers\BankController::class, 'history']);
     Route::post('/cheques', [\App\Http\Controllers\ChequeController::class, 'store']);
     Route::post('/cheques/{cheque}/receive', [\App\Http\Controllers\ChequeController::class, 'receive']);
     Route::post('/cheques/{cheque}/clear', [\App\Http\Controllers\ChequeController::class, 'clear']);

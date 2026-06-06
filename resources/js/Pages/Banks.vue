@@ -9,6 +9,7 @@ import SelectInput from '@/Components/SelectInput.vue';
 import TextArea from '@/Components/TextArea.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
+import axios from 'axios';
 
 import Pagination from '@/Components/Pagination.vue';
 
@@ -34,6 +35,47 @@ const isAdjustmentModalOpen = ref(false);
 const isAddBankModalOpen = ref(false);
 const isTransferModalOpen = ref(false);
 const selectedCheque = ref(null);
+
+// Bank History State
+const isHistoryModalOpen = ref(false);
+const selectedBankForHistory = ref(null);
+const historyDateFrom = ref('');
+const historyDateTo = ref('');
+const historyTransactions = ref([]);
+const isFetchingHistory = ref(false);
+
+const fetchBankHistory = async () => {
+    if (!selectedBankForHistory.value) return;
+    isFetchingHistory.value = true;
+    try {
+        const response = await axios.get(`/banks/${selectedBankForHistory.value.id}/history`, {
+            params: {
+                date_from: historyDateFrom.value,
+                date_to: historyDateTo.value
+            }
+        });
+        historyTransactions.value = response.data.transactions;
+    } catch (error) {
+        console.error('Error fetching bank history:', error);
+    } finally {
+        isFetchingHistory.value = false;
+    }
+};
+
+const openHistoryModal = (bank) => {
+    selectedBankForHistory.value = bank;
+    historyDateFrom.value = '';
+    historyDateTo.value = '';
+    historyTransactions.value = [];
+    isHistoryModalOpen.value = true;
+    fetchBankHistory();
+};
+
+watch([historyDateFrom, historyDateTo], () => {
+    if (isHistoryModalOpen.value) {
+        fetchBankHistory();
+    }
+});
 
 // Filters
 const bankFilter = ref(props.filters?.bank || 'all');
@@ -212,9 +254,13 @@ const formatPrice = (amount) => new Intl.NumberFormat('en-AE', { style: 'currenc
                         <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Available Balance</p>
                         <h2 class="text-3xl font-black text-slate-900 tracking-tighter">{{ formatPrice(bank.balance) }}</h2>
                     </div>
-                    <div class="mt-6 pt-4 border-t border-slate-50 flex items-center justify-between">
+                    <div class="mt-6 pt-4 border-t border-slate-50 flex items-center justify-between gap-2">
                          <button v-if="$page.props.auth.user.role !== 'viewer'" @click="openAdjustmentModal(bank)" class="text-[10px] font-black uppercase tracking-widest text-indigo-600 hover:text-indigo-700 transition-colors">Quick Adjust</button>
-                         <span class="text-[10px] font-bold text-slate-300 uppercase tracking-widest" :class="{'ml-auto': $page.props.auth.user.role === 'viewer'}">ID: #{{ bank.id }}</span>
+                         <button @click="openHistoryModal(bank)" class="text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-indigo-600 transition-colors flex items-center gap-1">
+                             <span class="material-symbols-outlined text-[14px]">history</span>
+                             History
+                         </button>
+                         <span class="text-[10px] font-bold text-slate-300 uppercase tracking-widest">ID: #{{ bank.id }}</span>
                     </div>
                 </div>
             </div>
@@ -544,6 +590,70 @@ const formatPrice = (amount) => new Intl.NumberFormat('en-AE', { style: 'currenc
                     <PrimaryButton :loading="transferForm.processing" class="!bg-indigo-600">Transfer Funds</PrimaryButton>
                 </div>
             </form>
+        </SideModal>
+
+        <!-- Bank History Modal -->
+        <SideModal :show="isHistoryModalOpen" :title="selectedBankForHistory ? selectedBankForHistory.name + ' - Transaction Log' : 'Bank History'" @close="isHistoryModalOpen = false">
+            <div class="space-y-6 p-2">
+                <!-- Bank Info Header Card -->
+                <div v-if="selectedBankForHistory" class="bg-indigo-50 p-6 rounded-[2rem] border border-indigo-100 mb-4 flex justify-between items-center">
+                    <div>
+                        <p class="text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-1">Account Balance</p>
+                        <h4 class="text-2xl font-black text-slate-900">{{ formatPrice(selectedBankForHistory.balance) }}</h4>
+                    </div>
+                    <span class="px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest bg-white text-indigo-600 border border-indigo-100">
+                        ID: #{{ selectedBankForHistory.id }}
+                    </span>
+                </div>
+
+                <!-- Date Range Filters -->
+                <div class="grid grid-cols-2 gap-4">
+                    <FormField label="Date From">
+                        <TextInput v-model="historyDateFrom" type="date" />
+                    </FormField>
+                    <FormField label="Date To">
+                        <TextInput v-model="historyDateTo" type="date" />
+                    </FormField>
+                </div>
+
+                <!-- History Transactions List -->
+                <div class="mt-6">
+                    <h5 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Historical Movements</h5>
+                    
+                    <div v-if="isFetchingHistory" class="py-12 text-center text-slate-400 font-bold flex flex-col items-center gap-2">
+                        <svg class="animate-spin h-8 w-8 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Loading transactions...
+                    </div>
+
+                    <div v-else class="space-y-4 max-h-[400px] overflow-y-auto pr-1">
+                        <div v-for="tx in historyTransactions" :key="tx.id" class="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between hover:bg-slate-100/50 transition-colors">
+                            <div>
+                                <p class="text-sm font-black text-slate-900">{{ tx.description }}</p>
+                                <div class="flex items-center gap-2 mt-1">
+                                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{{ tx.reference_type }}</span>
+                                    <span class="text-[10px] text-slate-300">•</span>
+                                    <span class="text-[10px] font-bold text-slate-400">{{ formatDate(tx.date) }}</span>
+                                </div>
+                            </div>
+                            <span :class="tx.type === 'deposit' ? 'text-emerald-600' : 'text-rose-600'" class="text-lg font-black whitespace-nowrap">
+                                {{ tx.type === 'deposit' ? '+' : '-' }} {{ formatPrice(tx.amount) }}
+                            </span>
+                        </div>
+
+                        <div v-if="historyTransactions.length === 0" class="py-12 text-center text-slate-400 italic text-sm">
+                            <span class="material-symbols-outlined text-4xl block mb-2 opacity-50">receipt_long</span>
+                            No transactions recorded for this period.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="pt-6 flex justify-end border-t mt-6">
+                    <SecondaryButton @click="isHistoryModalOpen = false" type="button">Close</SecondaryButton>
+                </div>
+            </div>
         </SideModal>
     </div>
 </template>
