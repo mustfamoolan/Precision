@@ -69,6 +69,7 @@ Route::middleware(['auth', 'restrict.viewer'])->group(function () {
     Route::delete('/notifications/{id}', [\App\Http\Controllers\NotificationController::class, 'destroy']);
     
     Route::get('/reports', [\App\Http\Controllers\ReportController::class, 'index'])->name('reports');
+    Route::get('/reports-all', [\App\Http\Controllers\ReportController::class, 'allData'])->name('reports.all');
     Route::get('/export/sales', [\App\Http\Controllers\ExportController::class, 'sales'])->name('export.sales');
     Route::get('/export/expenses', [\App\Http\Controllers\ExportController::class, 'expenses'])->name('export.expenses');
     Route::get('/export/inventory', [\App\Http\Controllers\ExportController::class, 'inventory'])->name('export.inventory');

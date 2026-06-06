@@ -127,4 +127,62 @@ class ReportController extends Controller
             'filters' => $request->all(['filter', 'start_date', 'end_date']),
         ]);
     }
+
+    public function allData(Request $request)
+    {
+        $startDate = Carbon::now()->startOfMonth();
+        $endDate = Carbon::now()->endOfMonth();
+
+        // Handle Filters
+        if ($request->filled(['start_date', 'end_date'])) {
+            $startDate = Carbon::parse($request->start_date);
+            $endDate = Carbon::parse($request->end_date);
+        } elseif ($request->get('filter') === 'week') {
+            $startDate = Carbon::now()->startOfWeek();
+            $endDate = Carbon::now()->endOfWeek();
+        } elseif ($request->get('filter') === 'month') {
+            $startDate = Carbon::now()->startOfMonth();
+            $endDate = Carbon::now()->endOfMonth();
+        }
+
+        // Summary Calculations
+        $totalSales = Sale::whereBetween('date', [$startDate, $endDate])->sum('amount');
+        $totalExpenses = Expense::whereBetween('date', [$startDate, $endDate])->sum('amount');
+
+        // Full Ledger Data (Unified query)
+        $salesQuery = DB::table('sales')
+            ->whereBetween('date', [$startDate, $endDate])
+            ->select('date', 'customer_name as name', 'invoice_number as reference', 'amount', 'paid_amount', 'due_amount', DB::raw("'sale' as type"), 'id');
+
+        $expensesQuery = DB::table('expenses')
+            ->leftJoin('employees', 'expenses.employee_id', '=', 'employees.id')
+            ->whereBetween('expenses.date', [$startDate, $endDate])
+            ->select(
+                'expenses.date', 
+                DB::raw("CONCAT(expenses.description, ' (', IFNULL(employees.name, 'System'), ')') as name"), 
+                'expenses.expense_number as reference',
+                'expenses.amount', 
+                'expenses.amount as paid_amount', 
+                DB::raw('0 as due_amount'), 
+                DB::raw("'expense' as type"),
+                'expenses.id'
+            );
+
+        $ledgerData = $salesQuery->unionAll($expensesQuery)
+            ->orderByDesc('date')
+            ->orderByDesc('id')
+            ->get();
+
+        return response()->json([
+            'summary' => [
+                'total_sales' => $totalSales,
+                'total_expenses' => $totalExpenses,
+                'net_profit' => $totalSales - $totalExpenses,
+                'start_date' => $startDate->format('Y-m-d'),
+                'end_date' => $endDate->format('Y-m-d'),
+                'period_label' => $startDate->format('M d') . ' - ' . $endDate->format('M d, Y'),
+            ],
+            'ledger' => $ledgerData,
+        ]);
+    }
 }

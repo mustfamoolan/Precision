@@ -24,6 +24,20 @@ const dateFrom = ref(props.filters?.start_date || props.summary?.start_date || '
 const dateTo   = ref(props.filters?.end_date   || props.summary?.end_date   || '');
 const activeFilter = ref(props.filters?.filter || 'month');
 
+// Sync local refs when props update
+watch(() => props.summary, (newSummary) => {
+    if (newSummary) {
+        dateFrom.value = props.filters?.start_date || newSummary.start_date || '';
+        dateTo.value = props.filters?.end_date || newSummary.end_date || '';
+    }
+}, { immediate: true });
+
+watch(() => props.filters, (newFilters) => {
+    if (newFilters) {
+        activeFilter.value = newFilters.filter || 'month';
+    }
+}, { immediate: true });
+
 const applyFilter = (type) => {
     activeFilter.value = type;
     router.get('/reports', { filter: type }, { preserveState: true });
@@ -114,9 +128,8 @@ const exportPDF = async () => {
         const { jsPDF } = await import('jspdf');
         
         // Fetch all transactions for the selected period
-        const response = await axios.get('/reports', {
+        const response = await axios.get('/reports-all', {
             params: {
-                all: true,
                 filter: activeFilter.value,
                 start_date: dateFrom.value,
                 end_date: dateTo.value
