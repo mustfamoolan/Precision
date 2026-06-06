@@ -30,6 +30,8 @@ class ReportController extends Controller
 
         // Summary Calculations
         $totalSales = Sale::whereBetween('date', [$startDate, $endDate])->sum('amount');
+        $totalSalesPaid = Sale::whereBetween('date', [$startDate, $endDate])->sum('paid_amount');
+        $totalSalesDue = Sale::whereBetween('date', [$startDate, $endDate])->sum('due_amount');
         $totalExpenses = Expense::whereBetween('date', [$startDate, $endDate])->sum('amount');
         
         // --- CASH FLOW (Monthly Breakdown for last 6 months) ---
@@ -95,6 +97,8 @@ class ReportController extends Controller
             return response()->json([
                 'summary' => [
                     'total_sales' => $totalSales,
+                    'total_sales_paid' => $totalSalesPaid,
+                    'total_sales_due' => $totalSalesDue,
                     'total_expenses' => $totalExpenses,
                     'net_profit' => $totalSales - $totalExpenses,
                     'start_date' => $startDate->format('Y-m-d'),
@@ -114,6 +118,8 @@ class ReportController extends Controller
         return Inertia::render('Reports', [
             'summary' => [
                 'total_sales' => $totalSales,
+                'total_sales_paid' => $totalSalesPaid,
+                'total_sales_due' => $totalSalesDue,
                 'total_expenses' => $totalExpenses,
                 'net_profit' => $totalSales - $totalExpenses,
                 'start_date' => $startDate->format('Y-m-d'),
@@ -147,6 +153,8 @@ class ReportController extends Controller
 
         // Summary Calculations
         $totalSales = Sale::whereBetween('date', [$startDate, $endDate])->sum('amount');
+        $totalSalesPaid = Sale::whereBetween('date', [$startDate, $endDate])->sum('paid_amount');
+        $totalSalesDue = Sale::whereBetween('date', [$startDate, $endDate])->sum('due_amount');
         $totalExpenses = Expense::whereBetween('date', [$startDate, $endDate])->sum('amount');
 
         // Full Ledger Data (Unified query)
@@ -176,6 +184,8 @@ class ReportController extends Controller
         return response()->json([
             'summary' => [
                 'total_sales' => $totalSales,
+                'total_sales_paid' => $totalSalesPaid,
+                'total_sales_due' => $totalSalesDue,
                 'total_expenses' => $totalExpenses,
                 'net_profit' => $totalSales - $totalExpenses,
                 'start_date' => $startDate->format('Y-m-d'),

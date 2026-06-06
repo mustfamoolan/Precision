@@ -180,21 +180,47 @@ const exportPDF = async () => {
         y = 42;
 
         // ── Summary ─────────────────────────────────────────────────────────────
-        doc.setFillColor(248, 250, 252);
-        doc.roundedRect(14, y, (W - 28) / 2 - 3, 22, 3, 3, 'F');
-        doc.setFontSize(8); doc.setTextColor(100, 116, 139); doc.setFont('helvetica', 'bold');
-        doc.text('TOTAL SALES', 20, y + 8);
-        doc.setFontSize(13); doc.setTextColor(16, 185, 129); doc.setFont('helvetica', 'bold');
-        doc.text(fmt(summaryData.total_sales), 20, y + 18);
+        const colsCount = 4;
+        const gap = 3;
+        const boxW = (W - 28 - (colsCount - 1) * gap) / colsCount;
+        const boxH = 20;
 
-        const x2 = 14 + (W - 28) / 2 + 3;
+        // Box 1: Total Sales
         doc.setFillColor(248, 250, 252);
-        doc.roundedRect(x2, y, (W - 28) / 2 - 3, 22, 3, 3, 'F');
-        doc.setFontSize(8); doc.setTextColor(100, 116, 139); doc.setFont('helvetica', 'bold');
-        doc.text('TOTAL EXPENSES', x2 + 6, y + 8);
-        doc.setFontSize(13); doc.setTextColor(239, 68, 68); doc.setFont('helvetica', 'bold');
-        doc.text(fmt(summaryData.total_expenses), x2 + 6, y + 18);
-        y += 32;
+        doc.roundedRect(14, y, boxW, boxH, 2, 2, 'F');
+        doc.setFontSize(7); doc.setTextColor(100, 116, 139); doc.setFont('helvetica', 'bold');
+        doc.text('TOTAL SALES', 14 + 3, y + 7);
+        doc.setFontSize(10); doc.setTextColor(30, 41, 59); doc.setFont('helvetica', 'bold');
+        doc.text(fmt(summaryData.total_sales), 14 + 3, y + 15);
+
+        // Box 2: Paid Sales
+        const x2 = 14 + boxW + gap;
+        doc.setFillColor(248, 250, 252);
+        doc.roundedRect(x2, y, boxW, boxH, 2, 2, 'F');
+        doc.setFontSize(7); doc.setTextColor(100, 116, 139); doc.setFont('helvetica', 'bold');
+        doc.text('PAID SALES', x2 + 3, y + 7);
+        doc.setFontSize(10); doc.setTextColor(16, 185, 129); doc.setFont('helvetica', 'bold');
+        doc.text(fmt(summaryData.total_sales_paid), x2 + 3, y + 15);
+
+        // Box 3: Unpaid (Due)
+        const x3 = x2 + boxW + gap;
+        doc.setFillColor(248, 250, 252);
+        doc.roundedRect(x3, y, boxW, boxH, 2, 2, 'F');
+        doc.setFontSize(7); doc.setTextColor(100, 116, 139); doc.setFont('helvetica', 'bold');
+        doc.text('UNPAID (DUE)', x3 + 3, y + 7);
+        doc.setFontSize(10); doc.setTextColor(217, 119, 6); doc.setFont('helvetica', 'bold');
+        doc.text(fmt(summaryData.total_sales_due), x3 + 3, y + 15);
+
+        // Box 4: Total Expenses
+        const x4 = x3 + boxW + gap;
+        doc.setFillColor(248, 250, 252);
+        doc.roundedRect(x4, y, boxW, boxH, 2, 2, 'F');
+        doc.setFontSize(7); doc.setTextColor(100, 116, 139); doc.setFont('helvetica', 'bold');
+        doc.text('TOTAL EXPENSES', x4 + 3, y + 7);
+        doc.setFontSize(10); doc.setTextColor(239, 68, 68); doc.setFont('helvetica', 'bold');
+        doc.text(fmt(summaryData.total_expenses), x4 + 3, y + 15);
+
+        y += boxH + 10;
 
         // ── Section 1: Sales Invoices ────────────────────────────────────────────
         addTitle('SECTION 1 — SALES INVOICES', 13, [30, 41, 59]); y += 2;
@@ -277,36 +303,66 @@ const exportPDF = async () => {
             </div>
         </div>
 
-        <!-- KPI Cards — only Total Sales + Total Expenses -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-8 mb-12">
-            <!-- Total Sales -->
-            <div class="group relative overflow-hidden bg-white/80 backdrop-blur-xl rounded-[2.5rem] p-8 border border-white shadow-xl shadow-slate-200/50 transition-all hover:-translate-y-1 hover:shadow-2xl">
+        <!-- KPI Cards — Total Sales, Paid, Unpaid (Due), Total Expenses -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+            <!-- Total Sales (Overall) -->
+            <div class="group relative overflow-hidden bg-white/80 backdrop-blur-xl rounded-3xl p-6 border border-white shadow-lg shadow-slate-200/40 transition-all hover:-translate-y-0.5 hover:shadow-xl">
                 <div class="relative z-10">
-                    <div class="flex items-center justify-between mb-6">
-                        <div class="w-14 h-14 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600">
-                            <span class="material-symbols-outlined text-3xl">trending_up</span>
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600">
+                            <span class="material-symbols-outlined text-xl">monetization_on</span>
                         </div>
-                        <span class="px-4 py-1.5 rounded-full bg-emerald-50 text-emerald-600 text-[10px] font-black uppercase tracking-widest">Inflow</span>
+                        <span class="px-3 py-1 rounded-full bg-indigo-50 text-indigo-600 text-[9px] font-black uppercase tracking-widest">Sales</span>
                     </div>
-                    <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Total Sales</p>
-                    <h2 class="text-3xl lg:text-4xl font-black text-slate-900 tracking-tighter">{{ fmt(summary.total_sales) }}</h2>
+                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Total Sales</p>
+                    <h2 class="text-2xl font-black text-slate-900 tracking-tight">{{ fmt(summary.total_sales) }}</h2>
                 </div>
-                <div class="absolute -right-10 -bottom-10 w-40 h-40 bg-emerald-500/5 rounded-full blur-3xl group-hover:bg-emerald-500/10 transition-all duration-700"></div>
+                <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-indigo-500/5 rounded-full blur-2xl group-hover:bg-indigo-500/10 transition-all duration-700"></div>
+            </div>
+
+            <!-- Sales Paid -->
+            <div class="group relative overflow-hidden bg-white/80 backdrop-blur-xl rounded-3xl p-6 border border-white shadow-lg shadow-slate-200/40 transition-all hover:-translate-y-0.5 hover:shadow-xl">
+                <div class="relative z-10">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600">
+                            <span class="material-symbols-outlined text-xl">payments</span>
+                        </div>
+                        <span class="px-3 py-1 rounded-full bg-emerald-50 text-emerald-600 text-[9px] font-black uppercase tracking-widest">Paid</span>
+                    </div>
+                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Paid Sales</p>
+                    <h2 class="text-2xl font-black text-emerald-600 tracking-tight">{{ fmt(summary.total_sales_paid) }}</h2>
+                </div>
+                <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-emerald-500/5 rounded-full blur-2xl group-hover:bg-emerald-500/10 transition-all duration-700"></div>
+            </div>
+
+            <!-- Sales Unpaid (Due) -->
+            <div class="group relative overflow-hidden bg-white/80 backdrop-blur-xl rounded-3xl p-6 border border-white shadow-lg shadow-slate-200/40 transition-all hover:-translate-y-0.5 hover:shadow-xl">
+                <div class="relative z-10">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600">
+                            <span class="material-symbols-outlined text-xl">pending_actions</span>
+                        </div>
+                        <span class="px-3 py-1 rounded-full bg-amber-50 text-amber-600 text-[9px] font-black uppercase tracking-widest">Unpaid</span>
+                    </div>
+                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Unpaid (Due)</p>
+                    <h2 class="text-2xl font-black text-amber-600 tracking-tight">{{ fmt(summary.total_sales_due) }}</h2>
+                </div>
+                <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-amber-500/5 rounded-full blur-2xl group-hover:bg-amber-500/10 transition-all duration-700"></div>
             </div>
 
             <!-- Total Expenses -->
-            <div class="group relative overflow-hidden bg-white/80 backdrop-blur-xl rounded-[2.5rem] p-8 border border-white shadow-xl shadow-slate-200/50 transition-all hover:-translate-y-1 hover:shadow-2xl">
+            <div class="group relative overflow-hidden bg-white/80 backdrop-blur-xl rounded-3xl p-6 border border-white shadow-lg shadow-slate-200/40 transition-all hover:-translate-y-0.5 hover:shadow-xl">
                 <div class="relative z-10">
-                    <div class="flex items-center justify-between mb-6">
-                        <div class="w-14 h-14 rounded-2xl bg-rose-50 flex items-center justify-center text-rose-600">
-                            <span class="material-symbols-outlined text-3xl">trending_down</span>
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="w-10 h-10 rounded-xl bg-rose-50 flex items-center justify-center text-rose-600">
+                            <span class="material-symbols-outlined text-xl">shopping_cart</span>
                         </div>
-                        <span class="px-4 py-1.5 rounded-full bg-rose-50 text-rose-600 text-[10px] font-black uppercase tracking-widest">Outflow</span>
+                        <span class="px-3 py-1 rounded-full bg-rose-50 text-rose-600 text-[9px] font-black uppercase tracking-widest">Expenses</span>
                     </div>
-                    <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Total Expenses</p>
-                    <h2 class="text-3xl lg:text-4xl font-black text-slate-900 tracking-tighter">{{ fmt(summary.total_expenses) }}</h2>
+                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Total Expenses</p>
+                    <h2 class="text-2xl font-black text-rose-600 tracking-tight">{{ fmt(summary.total_expenses) }}</h2>
                 </div>
-                <div class="absolute -right-10 -bottom-10 w-40 h-40 bg-rose-500/5 rounded-full blur-3xl group-hover:bg-rose-500/10 transition-all duration-700"></div>
+                <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-rose-500/5 rounded-full blur-2xl group-hover:bg-rose-500/10 transition-all duration-700"></div>
             </div>
         </div>
 
