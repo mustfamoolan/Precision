@@ -9,13 +9,18 @@ defineOptions({ layout: MainLayout });
 
 const props = defineProps({
     logs: Object,
-    filters: Object
+    filters: Object,
+    events: Array
 });
 
 const search = ref(props.filters.search || '');
+const eventFilter = ref(props.filters.event || '');
 
-const handleSearch = () => {
-    router.get('/activity-log', { search: search.value }, { preserveState: true, preserveScroll: true });
+const handleFilter = () => {
+    router.get('/activity-log', { 
+        search: search.value, 
+        event: eventFilter.value 
+    }, { preserveState: true, preserveScroll: true });
 };
 
 const getEventColor = (event) => {
@@ -74,15 +79,33 @@ const formatDate = (dateString) => {
                     </div>
                 </div>
                 
-                <div class="flex flex-1 max-w-md relative">
-                    <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">search</span>
-                    <input 
-                        v-model="search"
-                        @keyup.enter="handleSearch"
-                        type="text" 
-                        placeholder="Search logs by description, user, or event..." 
-                        class="w-full pl-12 pr-4 py-3 bg-slate-50 rounded-2xl border border-slate-200 focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-400 text-sm font-medium transition-all"
-                    />
+                <div class="flex flex-wrap sm:flex-nowrap items-center gap-4 w-full xl:w-auto xl:flex-1 justify-end max-w-2xl">
+                    <!-- Event Dropdown Filter -->
+                    <div class="w-full sm:w-48 relative">
+                        <select 
+                            v-model="eventFilter"
+                            @change="handleFilter"
+                            class="w-full px-4 py-3 bg-slate-50 rounded-2xl border border-slate-200 focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-400 text-xs font-black uppercase tracking-wider appearance-none cursor-pointer transition-all"
+                        >
+                            <option value="">All Statuses</option>
+                            <option value="created">Created</option>
+                            <option value="updated">Updated</option>
+                            <option value="deleted">Deleted</option>
+                        </select>
+                        <span class="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-[18px]">keyboard_arrow_down</span>
+                    </div>
+
+                    <!-- Search Input -->
+                    <div class="w-full sm:flex-1 max-w-md relative">
+                        <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">search</span>
+                        <input 
+                            v-model="search"
+                            @keyup.enter="handleFilter"
+                            type="text" 
+                            placeholder="Search logs by description or user..." 
+                            class="w-full pl-12 pr-4 py-3 bg-slate-50 rounded-2xl border border-slate-200 focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-400 text-sm font-medium transition-all"
+                        />
+                    </div>
                 </div>
             </div>
 

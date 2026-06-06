@@ -22,9 +22,16 @@ class ActivityLogController extends Controller
             });
         }
 
+        if ($request->event) {
+            $query->where('event', $request->event);
+        }
+
+        $events = ActivityLog::select('event')->distinct()->orderBy('event')->pluck('event');
+
         return Inertia::render('ActivityLog', [
             'logs' => $query->paginate(20)->withQueryString(),
-            'filters' => $request->only(['search'])
+            'filters' => $request->only(['search', 'event']),
+            'events' => $events
         ]);
     }
 }
