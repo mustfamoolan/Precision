@@ -593,7 +593,7 @@ const formatPrice = (amount) => new Intl.NumberFormat('en-AE', { style: 'currenc
         </SideModal>
 
         <!-- Bank History Modal -->
-        <SideModal :show="isHistoryModalOpen" :title="selectedBankForHistory ? selectedBankForHistory.name + ' - Transaction Log' : 'Bank History'" @close="isHistoryModalOpen = false">
+        <SideModal :show="isHistoryModalOpen" maxWidth="sm:w-[750px]" :title="selectedBankForHistory ? selectedBankForHistory.name + ' - Transaction Log' : 'Bank History'" @close="isHistoryModalOpen = false">
             <div class="space-y-6 p-2">
                 <!-- Bank Info Header Card -->
                 <div v-if="selectedBankForHistory" class="bg-indigo-50 p-6 rounded-[2rem] border border-indigo-100 mb-4 flex justify-between items-center">
