@@ -87,6 +87,24 @@ class ReportController extends Controller
                 'expenses.id'
             );
 
+        if ($request->has('all')) {
+            $ledgerData = $salesQuery->unionAll($expensesQuery)
+                ->orderByDesc('date')
+                ->orderByDesc('id')
+                ->get();
+            return response()->json([
+                'summary' => [
+                    'total_sales' => $totalSales,
+                    'total_expenses' => $totalExpenses,
+                    'net_profit' => $totalSales - $totalExpenses,
+                    'start_date' => $startDate->format('Y-m-d'),
+                    'end_date' => $endDate->format('Y-m-d'),
+                    'period_label' => $startDate->format('M d') . ' - ' . $endDate->format('M d, Y'),
+                ],
+                'ledger' => $ledgerData,
+            ]);
+        }
+
         $ledger = $salesQuery->unionAll($expensesQuery)
             ->orderByDesc('date')
             ->orderByDesc('id')

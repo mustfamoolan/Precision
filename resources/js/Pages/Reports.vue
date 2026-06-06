@@ -5,6 +5,7 @@ import MainLayout from '@/Layouts/MainLayout.vue';
 import Badge from '@/Components/Badge.vue';
 import Pagination from '@/Components/Pagination.vue';
 import { Chart, registerables } from 'chart.js';
+import axios from 'axios';
 Chart.register(...registerables);
 
 defineOptions({ layout: MainLayout });
@@ -104,85 +105,114 @@ onMounted(() => nextTick(buildChart));
 watch(() => props.cash_flow, () => nextTick(buildChart));
 
 // ─── PDF Export ───────────────────────────────────────────────────────────────
+const isDownloadingPDF = ref(false);
+
 const exportPDF = async () => {
-    const { jsPDF } = await import('jspdf');
-    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-    const W = doc.internal.pageSize.getWidth();
-    let y = 15;
+    if (isDownloadingPDF.value) return;
+    isDownloadingPDF.value = true;
+    try {
+        const { jsPDF } = await import('jspdf');
+        
+        // Fetch all transactions for the selected period
+        const response = await axios.get('/reports', {
+            params: {
+                all: true,
+                filter: activeFilter.value,
+                start_date: dateFrom.value,
+                end_date: dateTo.value
+            }
+        });
+        
+        const allLedger = response.data.ledger || [];
+        const summaryData = response.data.summary || props.summary;
 
-    const addTitle = (text, size = 14, color = [30, 41, 59]) => {
-        doc.setFontSize(size);
-        doc.setTextColor(...color);
+        const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+        const W = doc.internal.pageSize.getWidth();
+        let y = 15;
+
+        const addTitle = (text, size = 14, color = [30, 41, 59]) => {
+            doc.setFontSize(size);
+            doc.setTextColor(...color);
+            doc.setFont('helvetica', 'bold');
+            doc.text(text, 14, y);
+            y += size * 0.6;
+        };
+        const addLine = () => { doc.setDrawColor(220, 220, 220); doc.line(14, y, W - 14, y); y += 5; };
+        
+        const addRow = (cols, widths, isBold = false) => {
+            if (y > 270) { 
+                doc.addPage(); 
+                y = 20; 
+            }
+            doc.setFontSize(9);
+            doc.setFont('helvetica', isBold ? 'bold' : 'normal');
+            doc.setTextColor(50, 50, 80);
+            let x = 14;
+            cols.forEach((col, i) => { doc.text(String(col), x, y); x += widths[i]; });
+            y += 7;
+        };
+
+        // ── Header ──────────────────────────────────────────────────────────────
+        doc.setFillColor(30, 41, 59);
+        doc.rect(0, 0, W, 30, 'F');
+        doc.setFontSize(18);
+        doc.setTextColor(255, 255, 255);
         doc.setFont('helvetica', 'bold');
-        doc.text(text, 14, y);
-        y += size * 0.6;
-    };
-    const addLine = () => { doc.setDrawColor(220, 220, 220); doc.line(14, y, W - 14, y); y += 5; };
-    const addRow = (cols, widths, isBold = false) => {
+        doc.text('FINANCIAL REPORT', 14, 18);
         doc.setFontSize(9);
-        doc.setFont('helvetica', isBold ? 'bold' : 'normal');
-        doc.setTextColor(50, 50, 80);
-        let x = 14;
-        cols.forEach((col, i) => { doc.text(String(col), x, y); x += widths[i]; });
-        y += 7;
-        if (y > 270) { doc.addPage(); y = 20; }
-    };
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(148, 163, 184);
+        doc.text(`Period: ${summaryData.period_label}`, 14, 25);
+        doc.text(`Generated: ${new Date().toLocaleDateString('en-AE')}`, W - 55, 25);
+        y = 42;
 
-    // ── Header ──────────────────────────────────────────────────────────────
-    doc.setFillColor(30, 41, 59);
-    doc.rect(0, 0, W, 30, 'F');
-    doc.setFontSize(18);
-    doc.setTextColor(255, 255, 255);
-    doc.setFont('helvetica', 'bold');
-    doc.text('FINANCIAL REPORT', 14, 18);
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(148, 163, 184);
-    doc.text(`Period: ${props.summary.period_label}`, 14, 25);
-    doc.text(`Generated: ${new Date().toLocaleDateString('en-AE')}`, W - 55, 25);
-    y = 42;
+        // ── Summary ─────────────────────────────────────────────────────────────
+        doc.setFillColor(248, 250, 252);
+        doc.roundedRect(14, y, (W - 28) / 2 - 3, 22, 3, 3, 'F');
+        doc.setFontSize(8); doc.setTextColor(100, 116, 139); doc.setFont('helvetica', 'bold');
+        doc.text('TOTAL SALES', 20, y + 8);
+        doc.setFontSize(13); doc.setTextColor(16, 185, 129); doc.setFont('helvetica', 'bold');
+        doc.text(fmt(summaryData.total_sales), 20, y + 18);
 
-    // ── Summary ─────────────────────────────────────────────────────────────
-    doc.setFillColor(248, 250, 252);
-    doc.roundedRect(14, y, (W - 28) / 2 - 3, 22, 3, 3, 'F');
-    doc.setFontSize(8); doc.setTextColor(100, 116, 139); doc.setFont('helvetica', 'bold');
-    doc.text('TOTAL SALES', 20, y + 8);
-    doc.setFontSize(13); doc.setTextColor(16, 185, 129); doc.setFont('helvetica', 'bold');
-    doc.text(fmt(props.summary.total_sales), 20, y + 18);
+        const x2 = 14 + (W - 28) / 2 + 3;
+        doc.setFillColor(248, 250, 252);
+        doc.roundedRect(x2, y, (W - 28) / 2 - 3, 22, 3, 3, 'F');
+        doc.setFontSize(8); doc.setTextColor(100, 116, 139); doc.setFont('helvetica', 'bold');
+        doc.text('TOTAL EXPENSES', x2 + 6, y + 8);
+        doc.setFontSize(13); doc.setTextColor(239, 68, 68); doc.setFont('helvetica', 'bold');
+        doc.text(fmt(summaryData.total_expenses), x2 + 6, y + 18);
+        y += 32;
 
-    const x2 = 14 + (W - 28) / 2 + 3;
-    doc.setFillColor(248, 250, 252);
-    doc.roundedRect(x2, y, (W - 28) / 2 - 3, 22, 3, 3, 'F');
-    doc.setFontSize(8); doc.setTextColor(100, 116, 139); doc.setFont('helvetica', 'bold');
-    doc.text('TOTAL EXPENSES', x2 + 6, y + 8);
-    doc.setFontSize(13); doc.setTextColor(239, 68, 68); doc.setFont('helvetica', 'bold');
-    doc.text(fmt(props.summary.total_expenses), x2 + 6, y + 18);
-    y += 32;
+        // ── Section 1: Sales Invoices ────────────────────────────────────────────
+        addTitle('SECTION 1 — SALES INVOICES', 13, [30, 41, 59]); y += 2;
+        addLine();
+        const salesCols = ['Date', 'Customer', 'Inv #', 'Total', 'Paid', 'Due'];
+        const salesW    = [25, 55, 25, 25, 25, 25];
+        addRow(salesCols, salesW, true); addLine();
+        allLedger.filter(i => i.type === 'sale').forEach(item => {
+            addRow([fmtDate(item.date), item.name, item.reference, fmt(item.amount), fmt(item.paid_amount), fmt(item.due_amount)], salesW);
+        });
+        y += 5;
 
-    // ── Section 1: Sales Invoices ────────────────────────────────────────────
-    addTitle('SECTION 1 — SALES INVOICES', 13, [30, 41, 59]); y += 2;
-    addLine();
-    const salesCols = ['Date', 'Customer', 'Inv #', 'Total', 'Paid', 'Due'];
-    const salesW    = [25, 55, 25, 25, 25, 25];
-    addRow(salesCols, salesW, true); addLine();
-    props.ledger.data.filter(i => i.type === 'sale').forEach(item => {
-        addRow([fmtDate(item.date), item.name, item.reference, fmt(item.amount), fmt(item.paid_amount), fmt(item.due_amount)], salesW);
-    });
-    y += 5;
+        // ── Section 2: Expenses ──────────────────────────────────────────────────
+        if (y > 200) { doc.addPage(); y = 20; }
+        addTitle('SECTION 2 — EXPENSES', 13, [30, 41, 59]); y += 2;
+        addLine();
+        const expCols = ['Date', 'Description', 'Ref #', 'Amount'];
+        const expW    = [25, 85, 25, 35];
+        addRow(expCols, expW, true); addLine();
+        allLedger.filter(i => i.type === 'expense').forEach(item => {
+            addRow([fmtDate(item.date), item.name, item.reference, fmt(item.amount)], expW);
+        });
+        y += 5;
 
-    // ── Section 2: Expenses ──────────────────────────────────────────────────
-    if (y > 200) { doc.addPage(); y = 20; }
-    addTitle('SECTION 2 — EXPENSES', 13, [30, 41, 59]); y += 2;
-    addLine();
-    const expCols = ['Date', 'Description', 'Ref #', 'Amount'];
-    const expW    = [25, 85, 25, 35];
-    addRow(expCols, expW, true); addLine();
-    props.ledger.data.filter(i => i.type === 'expense').forEach(item => {
-        addRow([fmtDate(item.date), item.name, item.reference, fmt(item.amount)], expW);
-    });
-    y += 5;
-
-    doc.save(`financial-report-${props.summary.start_date}.pdf`);
+        doc.save(`financial-report-${summaryData.start_date}.pdf`);
+    } catch (error) {
+        console.error('Failed to generate PDF:', error);
+        alert('An error occurred while generating the PDF. Please try again.');
+    } finally {
+        isDownloadingPDF.value = false;
+    }
 };
 </script>
 
@@ -224,11 +254,12 @@ const exportPDF = async () => {
                 >Apply</button>
 
                 <!-- Export PDF -->
-                <button @click="exportPDF"
-                    class="flex items-center gap-2 px-6 py-2.5 bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl hover:bg-slate-800 transition-all active:scale-95"
+                <button @click="exportPDF" :disabled="isDownloadingPDF"
+                    class="flex items-center gap-2 px-6 py-2.5 bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl hover:bg-slate-800 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                    <span class="material-symbols-outlined text-lg">picture_as_pdf</span>
-                    Download PDF
+                    <span v-if="isDownloadingPDF" class="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></span>
+                    <span v-else class="material-symbols-outlined text-lg">picture_as_pdf</span>
+                    {{ isDownloadingPDF ? 'Generating...' : 'Download PDF' }}
                 </button>
             </div>
         </div>
@@ -296,11 +327,12 @@ const exportPDF = async () => {
                     <h3 class="text-xl font-black text-slate-900 uppercase tracking-tight">Transaction Ledger</h3>
                     <p class="text-sm text-slate-400 font-medium mt-0.5">{{ ledger.total }} total entries</p>
                 </div>
-                <button @click="exportPDF"
-                    class="flex items-center gap-2 px-5 py-3 border border-slate-200 rounded-2xl text-xs font-black text-slate-600 hover:bg-slate-50 transition-all active:scale-95"
+                <button @click="exportPDF" :disabled="isDownloadingPDF"
+                    class="flex items-center gap-2 px-5 py-3 border border-slate-200 rounded-2xl text-xs font-black text-slate-600 hover:bg-slate-50 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                    <span class="material-symbols-outlined text-lg">print</span>
-                    Export This View
+                    <span v-if="isDownloadingPDF" class="animate-spin w-4 h-4 border-2 border-slate-600 border-t-transparent rounded-full"></span>
+                    <span v-else class="material-symbols-outlined text-lg">print</span>
+                    {{ isDownloadingPDF ? 'Generating...' : 'Export This View' }}
                 </button>
             </div>
 
