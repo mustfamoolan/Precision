@@ -30,6 +30,10 @@ class ExpenseController extends Controller
             $query->where('category', $request->category);
         }
 
+        if ($request->filled('bank_id') && $request->bank_id !== 'all') {
+            $query->where('bank_id', $request->bank_id);
+        }
+
         if ($request->filled('search')) {
             $query->where(function($q) use ($request) {
                 $q->where('description', 'like', '%' . $request->search . '%')
@@ -63,7 +67,7 @@ class ExpenseController extends Controller
                 'employee' => $employeeExpenses,
                 'this_month_count' => $thisMonthCount,
             ],
-            'filters' => array_merge($request->all(['filter', 'search', 'category']), [
+            'filters' => array_merge($request->all(['filter', 'search', 'category', 'bank_id']), [
                 'start_date' => $start->format('Y-m-d'),
                 'end_date' => $end->format('Y-m-d'),
             ]),

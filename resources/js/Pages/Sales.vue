@@ -39,6 +39,7 @@ const search = ref(props.filters.search || '');
 const startDate = ref(props.filters.start_date || '');
 const endDate = ref(props.filters.end_date || '');
 const selectedStatus = ref(props.filters.status || 'all');
+const selectedBankId = ref(props.filters.bank_id || 'all');
 
 const form = useForm({
     date: new Date().toISOString().substr(0, 10),
@@ -143,10 +144,12 @@ const handleSearch = () => {
         start_date: startDate.value,
         end_date: endDate.value,
         status: selectedStatus.value,
+        bank_id: selectedBankId.value,
     }, { preserveState: true, preserveScroll: true });
 };
 
 watch(selectedStatus, () => handleSearch());
+watch(selectedBankId, () => handleSearch());
 
 const formatCurrency = (value) => {
     return new Intl.NumberFormat('en-AE', { style: 'currency', currency: 'AED' }).format(value || 0);
@@ -343,6 +346,11 @@ const statuses = [{label: 'All Status', value: 'all'}, {label: 'Paid', value: 'p
 
                     <select v-model="selectedStatus" class="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-xs font-bold text-slate-600 outline-none focus:ring-2 focus:ring-indigo-400 cursor-pointer w-40">
                         <option v-for="s in statuses" :key="s.value" :value="s.value">{{ s.label }}</option>
+                    </select>
+
+                    <select v-model="selectedBankId" class="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-xs font-bold text-slate-600 outline-none focus:ring-2 focus:ring-indigo-400 cursor-pointer w-48">
+                        <option value="all">All Accounts</option>
+                        <option v-for="b in banks" :key="b.id" :value="b.id">{{ b.name }}</option>
                     </select>
                 </div>
                 

@@ -51,7 +51,7 @@ class ExportController extends Controller
             $handle = fopen('php://output', 'w');
             fputcsv($handle, ['Date', 'Ref #', 'Description', 'Employee', 'Amount', 'Payment Method']);
 
-            Expense::with('employee')->latest('date')->latest('id')->chunk(100, function ($expenses) use ($handle) {
+            Expense::with(['employee', 'bank'])->latest('date')->latest('id')->chunk(100, function ($expenses) use ($handle) {
                 foreach ($expenses as $expense) {
                     fputcsv($handle, [
                         $expense->date,
@@ -59,7 +59,7 @@ class ExportController extends Controller
                         $expense->description,
                         $expense->employee->name ?? 'N/A',
                         $expense->amount,
-                        $expense->payment_method
+                        $expense->bank->name ?? $expense->payment_method
                     ]);
                 }
             });

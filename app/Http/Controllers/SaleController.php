@@ -48,6 +48,10 @@ class SaleController extends Controller
             $query->where('status', $request->status);
         }
 
+        if ($request->filled('bank_id') && $request->bank_id !== 'all') {
+            $query->where('bank_id', $request->bank_id);
+        }
+
         $sales = $query->with(['payments.bank', 'bank'])->latest('date')->latest('id')->paginate(15)->withQueryString();
 
         // Summary Data for the current view
@@ -65,7 +69,7 @@ class SaleController extends Controller
                 'total_overdue' => $totalOverdue,
                 'total_count' => $sales->count(),
             ],
-            'filters' => array_merge($request->all(['filter', 'search', 'type']), [
+            'filters' => array_merge($request->all(['filter', 'search', 'type', 'bank_id']), [
                 'start_date' => $start->format('Y-m-d'),
                 'end_date' => $end->format('Y-m-d'),
                 'status' => $request->get('status', 'all'),

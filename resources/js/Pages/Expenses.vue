@@ -25,6 +25,7 @@ const props = defineProps({
 const showAddModal = ref(false);
 const search = ref(props.filters.search || '');
 const selectedCategory = ref(props.filters.category || 'All');
+const selectedBankId = ref(props.filters.bank_id || 'all');
 const startDate = ref(props.filters.start_date || '');
 const endDate = ref(props.filters.end_date || '');
 
@@ -43,7 +44,7 @@ const form = useForm({
 
 const submit = () => {
     // Determine payment method string for backend from selected bank
-    const selectedBank = props.banks.find(b => b.id === form.bank_id);
+    const selectedBank = props.banks.find(b => b.id == form.bank_id);
     form.payment_method = selectedBank ? selectedBank.name : 'Cash';
 
     form.post('/expenses', {
@@ -67,12 +68,14 @@ const handleSearch = () => {
     router.get('/expenses', { 
         search: search.value,
         category: selectedCategory.value,
+        bank_id: selectedBankId.value,
         start_date: startDate.value,
         end_date: endDate.value
     }, { preserveState: true, preserveScroll: true });
 };
 
 watch(selectedCategory, () => handleSearch());
+watch(selectedBankId, () => handleSearch());
 
 const formatCurrency = (value) => {
     return new Intl.NumberFormat('en-AE', { style: 'currency', currency: 'AED' }).format(value);
@@ -157,7 +160,7 @@ const exportPDF = () => {
             expense.category, 
             supp, 
             formatCurrency(expense.amount).replace('AED', '').trim(), 
-            expense.payment_method, 
+            expense.bank?.name || expense.payment_method, 
             expense.status
         ], widths);
     });
@@ -281,6 +284,11 @@ const statuses = ['Paid', 'Partial', 'Unpaid'];
                     <select v-model="selectedCategory" class="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-xs font-bold text-slate-600 outline-none focus:ring-2 focus:ring-indigo-400 cursor-pointer w-40">
                         <option v-for="c in categories" :key="c" :value="c">{{ c }}</option>
                     </select>
+
+                    <select v-model="selectedBankId" class="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-xs font-bold text-slate-600 outline-none focus:ring-2 focus:ring-indigo-400 cursor-pointer w-48">
+                        <option value="all">All Banks</option>
+                        <option v-for="b in banks" :key="b.id" :value="b.id">{{ b.name }}</option>
+                    </select>
                 </div>
                 
                 <div class="flex flex-1 max-w-md relative">
@@ -329,7 +337,7 @@ const statuses = ['Paid', 'Partial', 'Unpaid'];
                             <td class="py-6 px-8 text-2xl font-black text-slate-900 whitespace-nowrap">{{ formatCurrency(expense.amount).replace('AED', '') }}</td>
                             <td class="py-6 px-8 whitespace-nowrap">
                                 <div class="flex flex-col gap-1 items-start">
-                                    <span class="text-base font-black px-3 py-1 rounded border border-slate-200 text-slate-500 uppercase tracking-wider">{{ expense.payment_method }}</span>
+                                    <span class="text-base font-black px-3 py-1 rounded border border-slate-200 text-slate-500 uppercase tracking-wider">{{ expense.bank?.name || expense.payment_method }}</span>
                                     <span class="text-base font-black uppercase" :class="expense.status === 'Paid' ? 'text-emerald-500' : 'text-rose-500'">{{ expense.status }}</span>
                                 </div>
                             </td>

@@ -166,6 +166,9 @@ class BankController extends Controller
                 'amount' => $validated['amount'],
                 'bank_id' => $validated['bank_id'],
                 'employee_id' => $validated['employee_id'],
+                'payment_method' => $bank->name,
+                'category' => 'Bank',
+                'status' => 'Paid',
             ]);
 
             // Log Transaction
