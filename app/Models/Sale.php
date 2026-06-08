@@ -51,4 +51,90 @@ class Sale extends Model
     {
         return $this->hasMany(SalePayment::class);
     }
+
+    protected static function booted()
+    {
+        static::created(function ($sale) {
+            $sale->adjustInventory('deduct');
+        });
+
+        static::updated(function ($sale) {
+            if ($sale->isDirty(['items', 'type', 'customer_name', 'invoice_number'])) {
+                // Revert inventory using original values
+                $originalType = $sale->getOriginal('type');
+                $originalItems = $sale->getOriginal('items');
+                $originalCustomer = $sale->getOriginal('customer_name');
+                
+                $originalSale = new static([
+                    'type' => $originalType,
+                    'items' => $originalItems,
+                    'customer_name' => $originalCustomer,
+                    'invoice_number' => $sale->getOriginal('invoice_number') ?? $sale->invoice_number,
+                ]);
+                $originalSale->id = $sale->id;
+                
+                $originalSale->adjustInventory('revert');
+
+                // Apply inventory using new values
+                $sale->adjustInventory('deduct');
+            }
+        });
+
+        static::deleted(function ($sale) {
+            $sale->adjustInventory('revert');
+        });
+    }
+
+    public function adjustInventory(string $action): void
+    {
+        $items = $this->items;
+        if (empty($items) || !is_array($items)) {
+            return;
+        }
+
+        if ($action === 'deduct') {
+            foreach ($items as $item) {
+                if (empty($item['inventory_id'])) {
+                    continue;
+                }
+
+                $inventory = Inventory::find($item['inventory_id']);
+                if ($inventory) {
+                    $location = $item['location'] ?? ($this->type === 'local' ? 'shop' : 'warehouse');
+                    $qtyField = $location . '_quantity';
+                    $qty = intval($item['quantity'] ?? 0);
+                    $inventory->decrement($qtyField, $qty);
+
+                    StockMovement::create([
+                        'inventory_id' => $inventory->id,
+                        'quantity' => $qty,
+                        'type' => 'out',
+                        'from_location' => $location,
+                        'to_location' => 'customer',
+                        'reference_type' => 'Sale',
+                        'reference_id' => $this->id,
+                        'notes' => ($this->type === 'local' ? 'Local Sale' : 'Export Sale') . ": {$this->invoice_number} for {$this->customer_name}"
+                    ]);
+                }
+            }
+        } elseif ($action === 'revert') {
+            foreach ($items as $item) {
+                if (empty($item['inventory_id'])) {
+                    continue;
+                }
+
+                $inventory = Inventory::find($item['inventory_id']);
+                if ($inventory) {
+                    $location = $item['location'] ?? ($this->type === 'local' ? 'shop' : 'warehouse');
+                    $qtyField = $location . '_quantity';
+                    $qty = intval($item['quantity'] ?? 0);
+                    $inventory->increment($qtyField, $qty);
+                }
+            }
+
+            StockMovement::where('reference_type', 'Sale')
+                ->where('reference_id', $this->id)
+                ->delete();
+        }
+    }
 }

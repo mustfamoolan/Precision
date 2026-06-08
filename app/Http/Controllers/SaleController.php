@@ -76,7 +76,7 @@ class SaleController extends Controller
             ]),
             'banks' => Bank::all(['id', 'name']),
             'customers' => \App\Models\Customer::orderBy('name')->get(['id', 'name', 'address']),
-            'inventory' => \App\Models\Inventory::with('brand:id,name')->get(['id', 'name', 'sku', 'selling_price', 'brand_id']),
+            'inventory' => \App\Models\Inventory::with('brand:id,name')->get(['id', 'name', 'sku', 'selling_price', 'brand_id', 'shop_quantity', 'warehouse_quantity', 'remote_quantity']),
         ]);
     }
 
@@ -117,29 +117,47 @@ class SaleController extends Controller
             $validated['status'] = 'pending';
         }
 
-        $sale = \App\Models\Sale::withoutEvents(function () use ($validated) {
-            // Safeguard: Ensure names and brand names are populated for items if missing
-            if (!empty($validated['items'])) {
-                foreach ($validated['items'] as &$item) {
-                    $inv = null;
-                    if (empty($item['name']) && !empty($item['inventory_id'])) {
-                        $inv = \App\Models\Inventory::with('brand')->find($item['inventory_id']);
-                        if ($inv) {
-                            $item['name'] = $inv->name;
-                        }
+        // Enforce inventory stock check
+        if (!empty($validated['items'])) {
+            foreach ($validated['items'] as $item) {
+                if (!empty($item['inventory_id'])) {
+                    $inventory = \App\Models\Inventory::find($item['inventory_id']);
+                    if (!$inventory) {
+                        return redirect()->back()->withErrors(['items' => "Product not found."]);
                     }
-                    if (empty($item['brand_name']) && !empty($item['inventory_id'])) {
-                        if (!$inv) {
-                            $inv = \App\Models\Inventory::with('brand')->find($item['inventory_id']);
-                        }
-                        if ($inv && $inv->brand) {
-                            $item['brand_name'] = $inv->brand->name;
-                        }
+                    $location = $item['location'] ?? ($validated['type'] === 'local' ? 'shop' : 'warehouse');
+                    $qtyField = $location . '_quantity';
+                    $requestedQty = intval($item['quantity'] ?? 0);
+
+                    if ($inventory->$qtyField < $requestedQty) {
+                        return redirect()->back()->withErrors(['items' => "Insufficient stock for product '{$inventory->name}' at location '{$location}'. Available: {$inventory->$qtyField}"]);
                     }
                 }
             }
-            return \App\Models\Sale::create($validated);
-        });
+        }
+
+        // Safeguard: Ensure names and brand names are populated for items if missing
+        if (!empty($validated['items'])) {
+            foreach ($validated['items'] as &$item) {
+                $inv = null;
+                if (empty($item['name']) && !empty($item['inventory_id'])) {
+                    $inv = \App\Models\Inventory::with('brand')->find($item['inventory_id']);
+                    if ($inv) {
+                        $item['name'] = $inv->name;
+                    }
+                }
+                if (empty($item['brand_name']) && !empty($item['inventory_id'])) {
+                    if (!$inv) {
+                        $inv = \App\Models\Inventory::with('brand')->find($item['inventory_id']);
+                    }
+                    if ($inv && $inv->brand) {
+                        $item['brand_name'] = $inv->brand->name;
+                    }
+                }
+            }
+        }
+
+        $sale = \App\Models\Sale::create($validated);
 
         // Record Initial Payment to Bank System
         if ($sale->paid_amount > 0 && $sale->bank_id) {
@@ -150,24 +168,6 @@ class SaleController extends Controller
                 'date' => $sale->date,
                 'note' => 'Initial payment upon creation'
             ]);
-        }
-
-        // Log stock movements for items (for history tracking)
-        if (!empty($validated['items'])) {
-            foreach ($validated['items'] as $item) {
-                if (!empty($item['inventory_id'])) {
-                    \App\Models\StockMovement::create([
-                        'inventory_id' => $item['inventory_id'],
-                        'quantity' => $item['quantity'],
-                        'type' => 'out',
-                        'from_location' => 'Export Sale',
-                        'to_location' => $validated['customer_name'],
-                        'reference_type' => 'Sale',
-                        'reference_id' => $sale->id,
-                        'notes' => 'Export Invoice Sale: ' . $validated['invoice_number'] . ' (Documentation only)'
-                    ]);
-                }
-            }
         }
 
         \App\Services\ActivityLogger::log('created', 'Created new ' . $sale->type . ' sale: ' . $sale->invoice_number . ' for ' . $sale->customer_name, $sale);
@@ -212,6 +212,35 @@ class SaleController extends Controller
             $validated['status'] = 'pending';
         }
 
+        // Enforce inventory stock check
+        if (!empty($validated['items'])) {
+            foreach ($validated['items'] as $item) {
+                if (!empty($item['inventory_id'])) {
+                    $inventory = \App\Models\Inventory::find($item['inventory_id']);
+                    if (!$inventory) {
+                        return redirect()->back()->withErrors(['items' => "Product not found."]);
+                    }
+                    $location = $item['location'] ?? ($validated['type'] === 'local' ? 'shop' : 'warehouse');
+                    $qtyField = $location . '_quantity';
+                    $requestedQty = intval($item['quantity'] ?? 0);
+
+                    // Account for original quantities of this sale in this location
+                    $existingQty = 0;
+                    if (!empty($sale->items)) {
+                        foreach ($sale->items as $oldItem) {
+                            if ($oldItem['inventory_id'] == $item['inventory_id'] && ($oldItem['location'] ?? ($sale->type === 'local' ? 'shop' : 'warehouse')) === $location) {
+                                $existingQty += intval($oldItem['quantity'] ?? 0);
+                            }
+                        }
+                    }
+
+                    if (($inventory->$qtyField + $existingQty) < $requestedQty) {
+                        return redirect()->back()->withErrors(['items' => "Insufficient stock for product '{$inventory->name}' at location '{$location}'. Available: " . ($inventory->$qtyField + $existingQty)]);
+                    }
+                }
+            }
+        }
+
         // Safeguard: Ensure names and brand names are populated for items if missing
         if (!empty($validated['items'])) {
             foreach ($validated['items'] as &$item) {
@@ -233,9 +262,7 @@ class SaleController extends Controller
             }
         }
 
-        \App\Models\Sale::withoutEvents(function () use ($sale, $validated) {
-            $sale->update($validated);
-        });
+        $sale->update($validated);
 
         // Sync Initial Payment with Bank System
         if ($sale->bank_id) {

@@ -118,10 +118,10 @@ const openEditModal = (sale) => {
         if (!item.brand_name && item.inventory_id) {
             const inv = props.inventory.find(i => i.id == item.inventory_id);
             if (inv && inv.brand) {
-                return { ...item, brand_name: inv.brand.name };
+                return { ...item, brand_name: inv.brand.name, location: item.location || 'warehouse' };
             }
         }
-        return item;
+        return { ...item, location: item.location || 'warehouse' };
     });
     form.customer_address = sale.customer_address || '';
     form.has_tax = sale.has_tax !== undefined ? !!sale.has_tax : true;
@@ -132,7 +132,7 @@ const openEditModal = (sale) => {
 };
 
 const addItem = () => {
-    form.items.push({ inventory_id: '', name: '', quantity: 1, rate: 0, currency: form.currency || 'AED' });
+    form.items.push({ inventory_id: '', name: '', quantity: 1, rate: 0, location: 'warehouse', currency: form.currency || 'AED' });
 };
 
 const removeItem = (index) => {
@@ -147,6 +147,30 @@ const onInventorySelect = (index, invId) => {
         form.items[index].rate = inv.selling_price || 0;
     }
 };
+
+const getAvailableStock = (inventoryId, location) => {
+    if (!inventoryId || !location) return 0;
+    const item = props.inventory.find(i => i.id == inventoryId);
+    if (!item) return 0;
+    
+    let existingQty = 0;
+    if (editingSale.value && editingSale.value.items) {
+        const oldItem = editingSale.value.items.find(i => i.inventory_id == inventoryId && (i.location || 'warehouse') === location);
+        if (oldItem) {
+            existingQty = parseFloat(oldItem.quantity || 0);
+        }
+    }
+    
+    return (parseFloat(item[location + '_quantity'] || 0) + existingQty);
+};
+
+const hasStockErrors = computed(() => {
+    return form.items.some(item => {
+        if (!item.inventory_id) return false;
+        const available = getAvailableStock(item.inventory_id, item.location);
+        return parseFloat(item.quantity || 0) > available;
+    });
+});
 
 const openAddModal = () => {
     editingSale.value = null;
@@ -194,6 +218,11 @@ watch(() => form.customer_name, (newName) => {
 });
 
 const submit = () => {
+    if (hasStockErrors.value) {
+        alert('Please correct stock errors before submitting.');
+        return;
+    }
+
     // Add prefix if not already there
     if (form.invoice_number && !form.invoice_number.startsWith('EXP-')) {
         form.invoice_number = 'EXP-' + form.invoice_number;
@@ -882,7 +911,7 @@ const exportInvoicePDF = async (sale) => {
         </div>
 
         <!-- Add/Edit Modal -->
-        <SideModal :show="showAddModal" :title="editingSale ? 'Edit EXP Invoice' : 'Add Export Invoice'" @close="showAddModal = false">
+        <SideModal :show="showAddModal" maxWidth="sm:w-[850px]" :title="editingSale ? 'Edit EXP Invoice' : 'Add Export Invoice'" @close="showAddModal = false">
             <form @submit.prevent="submit" class="space-y-5 p-2">
                 <div class="grid grid-cols-2 gap-4">
                     <FormField label="Date" :error="form.errors.date" required>
@@ -897,7 +926,7 @@ const exportInvoicePDF = async (sale) => {
                         />
                     </FormField>
                 </div>
-
+ 
                 <FormField label="Customer Name" :error="form.errors.customer_name" required>
                     <SelectInput 
                         v-model="form.customer_name" 
@@ -905,7 +934,7 @@ const exportInvoicePDF = async (sale) => {
                         placeholder="Select Customer..." 
                     />
                 </FormField>
-
+ 
                 <div class="grid grid-cols-2 gap-4">
                     <div class="flex items-center gap-4">
                         <label class="relative inline-flex items-center cursor-pointer">
@@ -919,13 +948,13 @@ const exportInvoicePDF = async (sale) => {
                         <SelectInput v-model="form.currency" :options="[{label: 'AED - UAE Dirham', value: 'AED'}, {label: 'USD - US Dollar', value: 'USD'}, {label: 'IQD - Iraqi Dinar', value: 'IQD'}]" />
                     </FormField>
                 </div>
-
+ 
                 <div v-if="form.has_tax" class="animate-in fade-in slide-in-from-top duration-300">
                     <FormField label="Tax Registration Number (TRN)" :error="form.errors.trn">
                         <TextInput v-model="form.trn" placeholder="100267536900003" />
                     </FormField>
                 </div>
-
+ 
                 <div class="grid grid-cols-2 gap-4">
                     <FormField label="Container / Shipment # (Optional)" :error="form.errors.container_number">
                         <TextInput v-model="form.container_number" prefix="CN-" placeholder="123456" />
@@ -934,25 +963,25 @@ const exportInvoicePDF = async (sale) => {
                         <SelectInput v-model="form.shipping_status" :options="shippingStatuses.map(s => ({label: s, value: s}))" />
                     </FormField>
                 </div>
-
+ 
                 <FormField label="Bank/Account (Optional)" :error="form.errors.bank_id">
                     <SelectInput 
                         v-model="form.bank_id" 
                         :options="[{label: 'None / Cash', value: ''}, ...banks.map(b => ({ label: b.name, value: b.id }))]" 
                     />
                 </FormField>
-
+ 
                 <FormField label="Notes / Remarks (Optional)" :error="form.errors.notes">
                     <TextArea v-model="form.notes" placeholder="Enter any additional notes..." rows="3" />
                 </FormField>
-
+ 
                 <!-- Items Section -->
                 <div class="border-t border-slate-100 pt-5 mt-5">
                     <div class="flex justify-between items-center mb-4">
                         <h4 class="text-xs font-black text-slate-400 uppercase tracking-widest">Included Items (Optional)</h4>
                         <button type="button" @click="addItem" class="text-[10px] font-black text-indigo-600 uppercase tracking-widest hover:underline">+ Add Item</button>
                     </div>
-
+ 
                     <div class="space-y-3">
                         <div v-for="(item, index) in form.items" :key="index" class="flex flex-wrap gap-3 items-end bg-slate-50 p-4 rounded-2xl border border-slate-100 shadow-sm">
                             <div class="flex-1 min-w-[200px]">
@@ -962,6 +991,13 @@ const exportInvoicePDF = async (sale) => {
                                     :options="inventory.map(i => ({ label: `${i.name}` + (i.sku ? ` (${i.sku})` : '') + (i.brand ? ` - ${i.brand.name}` : ''), value: i.id }))"
                                     @update:modelValue="(val) => onInventorySelect(index, val)"
                                     placeholder="Choose Product..."
+                                />
+                            </div>
+                            <div class="w-36">
+                                <label class="text-[9px] font-black text-slate-400 uppercase mb-1 block">Deduct From</label>
+                                <SelectInput 
+                                    v-model="item.location" 
+                                    :options="[{label: 'Shop (المحل)', value: 'shop'}, {label: 'Warehouse (المستودع)', value: 'warehouse'}, {label: 'Remote (عن بعد)', value: 'remote'}]"
                                 />
                             </div>
                             <div class="w-16">
@@ -980,11 +1016,22 @@ const exportInvoicePDF = async (sale) => {
                             <button type="button" @click="removeItem(index)" class="mb-2 w-8 h-8 rounded-lg flex items-center justify-center text-rose-500 hover:bg-rose-50 transition-colors">
                                 <span class="material-symbols-outlined text-[20px]">delete</span>
                             </button>
+
+                            <!-- Dynamic Real-time Stock Check -->
+                            <div class="w-full text-[10px] font-bold mt-1">
+                                <span v-if="getAvailableStock(item.inventory_id, item.location) >= item.quantity" class="text-emerald-600">
+                                    Available: {{ getAvailableStock(item.inventory_id, item.location) }} units
+                                </span>
+                                <span v-else class="text-rose-500 flex items-center gap-1">
+                                    <span class="material-symbols-outlined text-xs">warning</span>
+                                    Insufficient stock! Only {{ getAvailableStock(item.inventory_id, item.location) }} units available.
+                                </span>
+                            </div>
                         </div>
                         <div v-if="form.items.length === 0" class="text-center py-6 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200 text-[10px] text-slate-400 font-bold uppercase tracking-widest">No items added. Click + Add Item.</div>
                     </div>
                 </div>
-
+ 
                 <!-- Financial Summary Card (Light Theme) -->
                 <div class="mt-8 p-6 bg-slate-50 rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden relative group">
                     <div class="absolute top-0 right-0 p-8 opacity-5 group-hover:scale-110 transition-transform duration-500">
@@ -1026,10 +1073,10 @@ const exportInvoicePDF = async (sale) => {
                         </div>
                     </div>
                 </div>
-
+ 
                 <div class="pt-6 flex justify-end gap-3 border-t border-slate-100 mt-6">
                     <SecondaryButton @click="showAddModal = false" type="button">Cancel</SecondaryButton>
-                    <PrimaryButton :loading="form.processing" :disabled="form.processing">
+                    <PrimaryButton :loading="form.processing" :disabled="form.processing || hasStockErrors">
                         {{ editingSale ? 'Save Changes' : 'Create EXP Invoice' }}
                     </PrimaryButton>
                 </div>
@@ -1149,6 +1196,9 @@ const exportInvoicePDF = async (sale) => {
                                             </span>
                                             <span v-if="item.brand_name" class="px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded text-[9px] font-bold uppercase tracking-widest">
                                                 Brand: {{ item.brand_name }}
+                                            </span>
+                                            <span class="px-2 py-0.5 bg-amber-50 text-amber-600 rounded text-[9px] font-bold uppercase tracking-widest">
+                                                Location: {{ item.location || 'warehouse' }}
                                             </span>
                                             <span class="w-1 h-1 bg-slate-300 rounded-full"></span>
                                             <p class="text-[11px] font-bold text-indigo-600 uppercase tracking-widest">Qty: {{ item.quantity }}</p>
