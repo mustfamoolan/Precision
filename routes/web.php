@@ -54,6 +54,7 @@ Route::middleware(['auth', 'restrict.viewer'])->group(function () {
     Route::get('/shipping/{shipment}', [\App\Http\Controllers\ShippingToolController::class, 'show'])->name('shipping.show');
     Route::put('/shipping/{shipment}', [\App\Http\Controllers\ShippingToolController::class, 'update']);
     Route::delete('/shipping/{shipment}', [\App\Http\Controllers\ShippingToolController::class, 'destroy']);
+    Route::post('/shipping/exchange-rate', [\App\Http\Controllers\ShippingToolController::class, 'updateExchangeRate']);
     
     Route::post('/shipping/{shipment}/items', [\App\Http\Controllers\ShippingToolController::class, 'storeItem']);
     Route::delete('/shipping/items/{item}', [\App\Http\Controllers\ShippingToolController::class, 'deleteItem']);

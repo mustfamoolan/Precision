@@ -12,10 +12,16 @@ import Badge from '@/Components/Badge.vue';
 
 defineOptions({ layout: MainLayout });
 
-const props = defineProps({ shipment: Object });
+const props = defineProps({ shipment: Object, usd_exchange_rate: Number });
 
 const formatCurrency = (value) => {
     return new Intl.NumberFormat('en-AE', { style: 'currency', currency: 'AED' }).format(value);
+};
+
+const formatUSD = (aedValue) => {
+    const rate = props.usd_exchange_rate || 3.6725;
+    const usdValue = aedValue / rate;
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(usdValue);
 };
 const fmtDate = d => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
 
@@ -121,6 +127,10 @@ const exportPDF = async () => {
                 </div>
             </div>
             <div class="flex items-center gap-3">
+                <span class="bg-surface-container-high text-on-surface px-4 py-2 rounded-xl font-bold flex items-center gap-2 border border-outline-variant/30 text-xs">
+                    <span class="material-symbols-outlined text-[18px]">currency_exchange</span>
+                    Rate: 1 USD = {{ usd_exchange_rate }} AED
+                </span>
                 <button @click="exportPDF" class="bg-surface-container-lowest border border-outline-variant/30 px-6 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-surface-container-high transition-colors shadow-sm">
                     <span class="material-symbols-outlined text-[18px]">picture_as_pdf</span>
                     Export PDF Analysis
@@ -131,11 +141,12 @@ const exportPDF = async () => {
         <!-- Financial Pulse Row -->
         <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div class="bg-primary border border-primary-container p-6 rounded-2xl shadow-lg shadow-primary/10 text-on-primary">
-                <div class="flex justify-between items-center mb-4">
+                <div class="flex justify-between items-center mb-2">
                     <p class="text-[10px] font-bold opacity-80 uppercase tracking-widest">Balance Due</p>
                     <span class="material-symbols-outlined text-[18px] opacity-80">account_balance_wallet</span>
                 </div>
-                <h3 class="text-3xl font-headline font-black">{{ formatCurrency(shipment.balance_due) }}</h3>
+                <h3 class="text-2xl font-headline font-black">{{ formatCurrency(shipment.balance_due) }}</h3>
+                <p class="text-sm font-bold opacity-80 mt-1">/ {{ formatUSD(shipment.balance_due) }}</p>
                 <div class="mt-4 pt-4 border-t border-on-primary/10 flex justify-between items-center text-[10px] font-bold">
                     <span class="opacity-70 uppercase tracking-widest">Payment Status</span>
                     <span class="px-2 py-0.5 rounded-md bg-white/10">{{ shipment.payment_status }}</span>
@@ -143,13 +154,14 @@ const exportPDF = async () => {
             </div>
 
             <div v-for="fin in [
-                { label: 'Invoice Total', val: formatCurrency(shipment.invoice_amount), sub: 'Supplier Cost', color: 'text-on-surface' },
-                { label: 'Settled Amount', val: formatCurrency(shipment.paid_amount), sub: 'Confirmed Payments', color: 'text-emerald-600' },
-                { label: 'Logistics Costs', val: formatCurrency(shipment.total_costs), sub: 'Shipping + Tax + Fees', color: 'text-primary' }
+                { label: 'Invoice Total', val: shipment.invoice_amount, sub: 'Supplier Cost', color: 'text-on-surface' },
+                { label: 'Settled Amount', val: shipment.paid_amount, sub: 'Confirmed Payments', color: 'text-emerald-600' },
+                { label: 'Logistics Costs', val: shipment.total_costs, sub: 'Shipping + Tax + Fees', color: 'text-primary' }
             ]" :key="fin.label" class="bg-surface-container-lowest border border-outline-variant/20 p-6 rounded-2xl shadow-sm flex flex-col justify-between">
                 <div>
                     <p class="text-[10px] font-bold text-outline uppercase tracking-widest mb-1">{{ fin.label }}</p>
-                    <h3 class="text-xl font-headline font-black" :class="fin.color">{{ fin.val }}</h3>
+                    <h3 class="text-lg font-headline font-black" :class="fin.color">{{ formatCurrency(fin.val) }}</h3>
+                    <p class="text-xs text-outline font-semibold mt-1">/ {{ formatUSD(fin.val) }}</p>
                 </div>
                 <p class="text-[10px] text-outline font-bold mt-2">{{ fin.sub }}</p>
             </div>
@@ -239,7 +251,10 @@ const exportPDF = async () => {
                             <tbody class="divide-y divide-outline-variant/10">
                                 <tr v-for="pay in shipment.payments" :key="pay.id" class="hover:bg-surface-container-low/30 transition-colors">
                                     <td class="py-6 px-6 text-xl font-bold text-on-surface-variant">{{ fmtDate(pay.payment_date) }}</td>
-                                    <td class="py-6 px-6 text-2xl font-black text-emerald-600">{{ formatCurrency(pay.amount) }}</td>
+                                    <td class="py-6 px-6">
+                                        <p class="text-xl font-black text-emerald-600">{{ formatCurrency(pay.amount) }}</p>
+                                        <p class="text-xs font-bold text-outline mt-0.5">/ {{ formatUSD(pay.amount) }}</p>
+                                    </td>
                                     <td class="py-6 px-6 text-sm font-bold text-outline uppercase">{{ pay.payment_method }}</td>
                                     <td class="py-4 px-6 text-right" v-if="$page.props.auth.user.role !== 'viewer'">
                                         <button @click="deletePayment(pay.id)" class="text-outline hover:text-error transition-colors">
@@ -317,11 +332,17 @@ const exportPDF = async () => {
                             { label: 'Other', val: shipment.other_costs }
                         ]" :key="cost.label" class="flex justify-between items-center text-xs">
                             <span class="font-bold text-outline uppercase tracking-widest text-[9px]">{{ cost.label }}</span>
-                            <span class="font-black text-on-surface">{{ formatCurrency(cost.val) }}</span>
+                            <div class="text-right">
+                                <p class="font-black text-on-surface">{{ formatCurrency(cost.val) }}</p>
+                                <p class="text-[10px] text-outline font-semibold">/ {{ formatUSD(cost.val) }}</p>
+                            </div>
                         </div>
                         <div class="pt-4 border-t border-outline-variant/20 flex justify-between items-center">
                             <span class="text-[10px] font-black text-primary uppercase tracking-widest">Total Logistics</span>
-                            <span class="text-sm font-black text-primary">{{ formatCurrency(shipment.total_costs) }}</span>
+                            <div class="text-right">
+                                <p class="text-sm font-black text-primary">{{ formatCurrency(shipment.total_costs) }}</p>
+                                <p class="text-[10px] text-outline font-semibold">/ {{ formatUSD(shipment.total_costs) }}</p>
+                            </div>
                         </div>
                     </div>
                 </div>

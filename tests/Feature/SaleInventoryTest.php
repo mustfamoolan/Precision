@@ -100,6 +100,24 @@ class SaleInventoryTest extends TestCase
         $inventory->refresh();
         $this->assertEquals(5, $inventory->shop_quantity);
 
+        $this->assertDatabaseHas('stock_movements', [
+            'inventory_id' => $inventory->id,
+            'quantity' => 3,
+            'type' => 'in',
+            'from_location' => 'customer',
+            'to_location' => 'shop',
+            'notes' => 'Returned due to Sale Edit: INV-1001 for John Doe'
+        ]);
+
+        $this->assertDatabaseHas('stock_movements', [
+            'inventory_id' => $inventory->id,
+            'quantity' => 5,
+            'type' => 'out',
+            'from_location' => 'shop',
+            'to_location' => 'customer',
+            'notes' => 'Local Sale (Edit): INV-1001 for John Doe'
+        ]);
+
         // Update location to warehouse
         $sale->update([
             'items' => [
@@ -115,6 +133,24 @@ class SaleInventoryTest extends TestCase
         $inventory->refresh();
         $this->assertEquals(10, $inventory->shop_quantity); // shop quantity reverted
         $this->assertEquals(16, $inventory->warehouse_quantity); // warehouse quantity decremented by 4
+
+        $this->assertDatabaseHas('stock_movements', [
+            'inventory_id' => $inventory->id,
+            'quantity' => 5,
+            'type' => 'in',
+            'from_location' => 'customer',
+            'to_location' => 'shop',
+            'notes' => 'Returned due to Sale Edit: INV-1001 for John Doe'
+        ]);
+
+        $this->assertDatabaseHas('stock_movements', [
+            'inventory_id' => $inventory->id,
+            'quantity' => 4,
+            'type' => 'out',
+            'from_location' => 'warehouse',
+            'to_location' => 'customer',
+            'notes' => 'Local Sale (Edit): INV-1001 for John Doe'
+        ]);
     }
 
     public function test_deleting_sale_reverts_inventory()
@@ -150,9 +186,14 @@ class SaleInventoryTest extends TestCase
 
         $inventory->refresh();
         $this->assertEquals(10, $inventory->shop_quantity);
-        $this->assertDatabaseMissing('stock_movements', [
-            'reference_type' => 'Sale',
-            'reference_id' => $sale->id,
+
+        $this->assertDatabaseHas('stock_movements', [
+            'inventory_id' => $inventory->id,
+            'quantity' => 3,
+            'type' => 'in',
+            'from_location' => 'customer',
+            'to_location' => 'shop',
+            'notes' => 'Returned due to Sale Deletion: INV-1001 for John Doe'
         ]);
     }
 }

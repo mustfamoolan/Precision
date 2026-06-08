@@ -55,7 +55,7 @@ class Sale extends Model
     protected static function booted()
     {
         static::created(function ($sale) {
-            $sale->adjustInventory('deduct');
+            $sale->adjustInventory('deduct', 'new');
         });
 
         static::updated(function ($sale) {
@@ -73,19 +73,19 @@ class Sale extends Model
                 ]);
                 $originalSale->id = $sale->id;
                 
-                $originalSale->adjustInventory('revert');
+                $originalSale->adjustInventory('revert', 'edit');
 
                 // Apply inventory using new values
-                $sale->adjustInventory('deduct');
+                $sale->adjustInventory('deduct', 'edit');
             }
         });
 
         static::deleted(function ($sale) {
-            $sale->adjustInventory('revert');
+            $sale->adjustInventory('revert', 'delete');
         });
     }
 
-    public function adjustInventory(string $action): void
+    public function adjustInventory(string $action, string $reason = 'new'): void
     {
         $items = $this->items;
         if (empty($items) || !is_array($items)) {
@@ -113,7 +113,10 @@ class Sale extends Model
                         'to_location' => 'customer',
                         'reference_type' => 'Sale',
                         'reference_id' => $this->id,
-                        'notes' => ($this->type === 'local' ? 'Local Sale' : 'Export Sale') . ": {$this->invoice_number} for {$this->customer_name}"
+                        'notes' => ($reason === 'edit'
+                            ? ($this->type === 'local' ? 'Local Sale (Edit)' : 'Export Sale (Edit)')
+                            : ($this->type === 'local' ? 'Local Sale (New)' : 'Export Sale (New)'))
+                            . ": {$this->invoice_number} for {$this->customer_name}"
                     ]);
                 }
             }
@@ -129,12 +132,22 @@ class Sale extends Model
                     $qtyField = $location . '_quantity';
                     $qty = intval($item['quantity'] ?? 0);
                     $inventory->increment($qtyField, $qty);
+
+                    StockMovement::create([
+                        'inventory_id' => $inventory->id,
+                        'quantity' => $qty,
+                        'type' => 'in',
+                        'from_location' => 'customer',
+                        'to_location' => $location,
+                        'reference_type' => 'Sale',
+                        'reference_id' => $this->id,
+                        'notes' => ($reason === 'delete'
+                            ? ($this->type === 'local' ? 'Returned due to Sale Deletion' : 'Returned due to Export Sale Deletion')
+                            : ($this->type === 'local' ? 'Returned due to Sale Edit' : 'Returned due to Export Sale Edit'))
+                            . ": {$this->invoice_number} for {$this->customer_name}"
+                    ]);
                 }
             }
-
-            StockMovement::where('reference_type', 'Sale')
-                ->where('reference_id', $this->id)
-                ->delete();
         }
     }
 }

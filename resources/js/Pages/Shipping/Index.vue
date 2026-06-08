@@ -13,13 +13,37 @@ import Pagination from '@/Components/Pagination.vue';
 
 defineOptions({ layout: MainLayout });
 
-const props = defineProps({ shipments: Object, summary: Object, filters: Object });
+const props = defineProps({ shipments: Object, summary: Object, filters: Object, usd_exchange_rate: Number });
 
 const search   = ref(props.filters?.search || '');
 const statusF  = ref(props.filters?.status || '');
 const showForm = ref(false);
 const editing  = ref(null);
 const statuses = ['On Board', 'In Transit', 'Delivered', 'Completed'];
+
+const formatUSD = (aedValue) => {
+    const rate = props.usd_exchange_rate || 3.6725;
+    const usdValue = aedValue / rate;
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(usdValue);
+};
+
+const showExchangeModal = ref(false);
+const exchangeForm = useForm({
+    usd_exchange_rate: props.usd_exchange_rate || 3.6725,
+});
+
+const openExchangeModal = () => {
+    exchangeForm.usd_exchange_rate = props.usd_exchange_rate || 3.6725;
+    showExchangeModal.value = true;
+};
+
+const submitExchangeRate = () => {
+    exchangeForm.post('/shipping/exchange-rate', {
+        onSuccess: () => {
+            showExchangeModal.value = false;
+        }
+    });
+};
 
 const formatCurrency = (value) => {
     return new Intl.NumberFormat('en-AE', { style: 'currency', currency: 'AED' }).format(value);
@@ -68,19 +92,30 @@ const doSearch = () => router.get('/shipping', { search: search.value, status: s
                 <h1 class="text-2xl font-headline font-bold text-on-surface tracking-tight">Logistics Overview</h1>
                 <p class="text-sm text-outline font-label">Container Tracking & Financials</p>
             </div>
-            <div class="flex items-center gap-3" v-if="$page.props.auth.user.role !== 'viewer'">
-                <button @click="openAdd" class="bg-primary text-on-primary px-6 py-2.5 rounded-xl font-bold flex items-center gap-2 hover:bg-primary/90 transition-all active:scale-95 shadow-lg shadow-primary/20">
-                    <span class="material-symbols-outlined text-[20px]">add_box</span>
-                    New Shipment
-                </button>
+            <div class="flex items-center gap-3">
+                <span v-if="$page.props.auth.user.role === 'viewer'" class="bg-surface-container-high text-on-surface px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 border border-outline-variant/30 text-xs">
+                    <span class="material-symbols-outlined text-[20px]">currency_exchange</span>
+                    Exchange Rate: 1 USD = {{ usd_exchange_rate }} AED
+                </span>
+                <template v-else>
+                    <button @click="openExchangeModal" class="bg-surface-container-high text-on-surface px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 border border-outline-variant/30 hover:bg-surface-container-highest transition-all active:scale-95 text-xs">
+                        <span class="material-symbols-outlined text-[20px]">currency_exchange</span>
+                        Rate: 1 USD = {{ usd_exchange_rate }} AED
+                    </button>
+                    <button @click="openAdd" class="bg-primary text-on-primary px-6 py-2.5 rounded-xl font-bold flex items-center gap-2 hover:bg-primary/90 transition-all active:scale-95 shadow-lg shadow-primary/20 text-xs">
+                        <span class="material-symbols-outlined text-[20px]">add_box</span>
+                        New Shipment
+                    </button>
+                </template>
             </div>
         </div>
-
+ 
         <!-- KPI Grid - Matching Dashboard.vue -->
         <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div class="bg-primary border border-primary-container p-5 rounded-2xl shadow-lg shadow-primary/10 text-on-primary">
                 <p class="text-[10px] font-bold opacity-80 uppercase tracking-widest mb-1">Total Balance Due</p>
                 <h3 class="text-2xl font-headline font-black">{{ formatCurrency(summary.total_balance_due) }}</h3>
+                <p class="text-sm font-bold opacity-90 mt-1">/ {{ formatUSD(summary.total_balance_due) }}</p>
                 <p class="text-[10px] font-bold mt-2 opacity-70">Total outstanding payments</p>
             </div>
 
@@ -141,8 +176,11 @@ const doSearch = () => router.get('/shipping', { search: search.value, status: s
                                 </span>
                             </td>
                             <td class="py-6 px-6">
-                                <p class="text-2xl font-black" :class="s.balance_due > 0 ? 'text-error' : 'text-emerald-600'">
+                                <p class="text-xl font-black" :class="s.balance_due > 0 ? 'text-error' : 'text-emerald-600'">
                                     {{ formatCurrency(s.balance_due) }}
+                                </p>
+                                <p class="text-xs text-outline font-semibold mt-0.5">
+                                    / {{ formatUSD(s.balance_due) }}
                                 </p>
                             </td>
                             <td class="py-4 px-6 text-right">
@@ -219,6 +257,22 @@ const doSearch = () => router.get('/shipping', { search: search.value, status: s
                 <div class="flex justify-end gap-3 pt-4">
                     <SecondaryButton @click="showForm=false" type="button">Cancel</SecondaryButton>
                     <PrimaryButton :loading="form.processing">{{ editing ? 'Update' : 'Create' }}</PrimaryButton>
+                </div>
+            </form>
+        </SideModal>
+
+        <!-- Update Exchange Rate Modal -->
+        <SideModal :show="showExchangeModal" title="Update Exchange Rate" @close="showExchangeModal=false">
+            <form @submit.prevent="submitExchangeRate" class="space-y-6 p-4">
+                <div class="space-y-4">
+                    <p class="text-xs text-outline">Specify the exchange rate of 1 USD to AED.</p>
+                    <FormField label="Exchange Rate (1 USD = ? AED)" :error="exchangeForm.errors.usd_exchange_rate" required>
+                        <TextInput v-model="exchangeForm.usd_exchange_rate" type="number" step="0.0001" min="0.01" />
+                    </FormField>
+                </div>
+                <div class="flex justify-end gap-3 pt-4 border-t border-outline-variant/10 mt-6">
+                    <SecondaryButton @click="showExchangeModal=false" type="button">Cancel</SecondaryButton>
+                    <PrimaryButton :loading="exchangeForm.processing">Save Rate</PrimaryButton>
                 </div>
             </form>
         </SideModal>

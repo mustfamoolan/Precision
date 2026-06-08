@@ -6,6 +6,7 @@ use App\Models\Shipment;
 use App\Models\ShipmentItem;
 use App\Models\ShipmentPayment;
 use App\Models\Sale;
+use App\Models\Setting;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -54,6 +55,7 @@ class ShippingToolController extends Controller
             'shipments' => $shipments,
             'summary'   => $summary,
             'filters'   => $request->all(['search', 'status']),
+            'usd_exchange_rate' => floatval(Setting::get('usd_exchange_rate', 3.6725)),
         ]);
     }
 
@@ -73,7 +75,8 @@ class ShippingToolController extends Controller
         ]);
 
         return Inertia::render('Shipping/Show', [
-            'shipment' => $data
+            'shipment' => $data,
+            'usd_exchange_rate' => floatval(Setting::get('usd_exchange_rate', 3.6725)),
         ]);
     }
 
@@ -201,5 +204,18 @@ class ShippingToolController extends Controller
         \App\Services\ActivityLogger::log('deleted', 'Removed payment of ' . $amount . ' from shipment ' . $container);
 
         return redirect()->back()->with('success', 'Payment removed.');
+    }
+
+    public function updateExchangeRate(Request $request)
+    {
+        $validated = $request->validate([
+            'usd_exchange_rate' => 'required|numeric|min:0.01',
+        ]);
+
+        Setting::set('usd_exchange_rate', $validated['usd_exchange_rate']);
+
+        \App\Services\ActivityLogger::log('updated', 'Updated USD exchange rate to: ' . $validated['usd_exchange_rate']);
+
+        return redirect()->back()->with('success', 'Exchange rate updated successfully.');
     }
 }
