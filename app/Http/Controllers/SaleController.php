@@ -96,9 +96,13 @@ class SaleController extends Controller
             'items' => 'nullable|array',
             'customer_address' => 'nullable|string|max:500',
             'has_tax' => 'nullable|boolean',
-            'currency' => 'nullable|string',
-            'trn' => 'nullable|string',
-            'notes' => 'nullable|string',
+            'is_cheque' => 'nullable|boolean',
+            'cheque_number' => 'nullable|required_if:is_cheque,true|string',
+            'cheque_due_date' => 'nullable|required_if:is_cheque,true|date',
+            'cheque_sender_name' => 'nullable|required_if:is_cheque,true|string',
+            'cheque_receiver_name' => 'nullable|required_if:is_cheque,true|string',
+
+
 
         ]);
 
@@ -159,15 +163,28 @@ class SaleController extends Controller
 
         $sale = \App\Models\Sale::create($validated);
 
-        // Record Initial Payment to Bank System
-        if ($sale->paid_amount > 0 && $sale->bank_id) {
-            \App\Models\SalePayment::create([
-                'sale_id' => $sale->id,
-                'bank_id' => $sale->bank_id,
-                'amount' => $sale->paid_amount,
-                'date' => $sale->date,
-                'note' => 'Initial payment upon creation'
-            ]);
+        // Record Initial Payment
+        if ($sale->paid_amount > 0) {
+            if ($request->is_cheque) {
+                \App\Models\Cheque::create([
+                    'cheque_number' => $request->cheque_number,
+                    'sender_name' => $request->cheque_sender_name,
+                    'receiver_name' => $request->cheque_receiver_name,
+                    'party_name' => $request->cheque_sender_name,
+                    'amount' => $sale->paid_amount,
+                    'due_date' => $request->cheque_due_date,
+                    'type' => 'incoming',
+                    'status' => 'pending',
+                ]);
+            } elseif ($sale->bank_id) {
+                \App\Models\SalePayment::create([
+                    'sale_id' => $sale->id,
+                    'bank_id' => $sale->bank_id,
+                    'amount' => $sale->paid_amount,
+                    'date' => $sale->date,
+                    'note' => 'Initial payment upon creation'
+                ]);
+            }
         }
 
         \App\Services\ActivityLogger::log('created', 'Created new ' . $sale->type . ' sale: ' . $sale->invoice_number . ' for ' . $sale->customer_name, $sale);
@@ -194,6 +211,13 @@ class SaleController extends Controller
             'currency' => 'nullable|string',
             'trn' => 'nullable|string',
             'notes' => 'nullable|string',
+            'is_cheque' => 'nullable|boolean',
+            'cheque_number' => 'nullable|required_if:is_cheque,true|string',
+            'cheque_due_date' => 'nullable|required_if:is_cheque,true|date',
+            'cheque_sender_name' => 'nullable|required_if:is_cheque,true|string',
+            'cheque_receiver_name' => 'nullable|required_if:is_cheque,true|string',
+
+
 
         ]);
 
@@ -264,13 +288,29 @@ class SaleController extends Controller
 
         $sale->update($validated);
 
-        // Sync Initial Payment with Bank System
-        if ($sale->bank_id) {
+        // Sync Initial Payment with Bank System or Cheque
+        if ($validated['paid_amount'] > 0) {
             $initialPayment = \App\Models\SalePayment::where('sale_id', $sale->id)
                 ->where('note', 'Initial payment upon creation')
                 ->first();
-
-            if ($validated['paid_amount'] > 0) {
+                
+            if ($request->is_cheque) {
+                // If switching to cheque, delete old SalePayment if it exists
+                if ($initialPayment) $initialPayment->delete();
+                
+                // Create cheque (unless we want to track updates to existing cheques, we keep it simple)
+                // Note: We might create multiple cheques if they keep updating, but for now it's fine.
+                \App\Models\Cheque::create([
+                    'cheque_number' => $request->cheque_number,
+                    'sender_name' => $request->cheque_sender_name,
+                    'receiver_name' => $request->cheque_receiver_name,
+                    'party_name' => $request->cheque_sender_name,
+                    'amount' => $validated['paid_amount'],
+                    'due_date' => $request->cheque_due_date,
+                    'type' => 'incoming',
+                    'status' => 'pending',
+                ]);
+            } else if ($sale->bank_id) {
                 if ($initialPayment) {
                     $initialPayment->update([
                         'bank_id' => $sale->bank_id,
@@ -286,9 +326,12 @@ class SaleController extends Controller
                         'note' => 'Initial payment upon creation'
                     ]);
                 }
-            } elseif ($initialPayment) {
-                $initialPayment->delete();
             }
+        } else {
+            $initialPayment = \App\Models\SalePayment::where('sale_id', $sale->id)
+                ->where('note', 'Initial payment upon creation')
+                ->first();
+            if ($initialPayment) $initialPayment->delete();
         }
 
         \App\Services\ActivityLogger::log('updated', 'Updated ' . $sale->type . ' sale: ' . $sale->invoice_number, $sale);
@@ -300,21 +343,39 @@ class SaleController extends Controller
     {
         $request->validate([
             'payment_amount' => 'required|numeric|min:0.01',
-            'bank_id' => 'required|exists:banks,id',
             'payment_date' => 'required|date',
+            'is_cheque' => 'nullable|boolean',
+            'cheque_number' => 'nullable|required_if:is_cheque,true|string',
+            'cheque_due_date' => 'nullable|required_if:is_cheque,true|date',
+            'cheque_sender_name' => 'nullable|required_if:is_cheque,true|string',
+            'cheque_receiver_name' => 'nullable|required_if:is_cheque,true|string',
+            'bank_id' => 'nullable|required_unless:is_cheque,true|exists:banks,id',
         ]);
 
-        // Create individual payment record (this updates bank balance and records transaction)
-        \App\Models\SalePayment::create([
-            'sale_id' => $sale->id,
-            'bank_id' => $request->bank_id,
-            'amount' => $request->payment_amount,
-            'date' => $request->payment_date,
-        ]);
+        if ($request->is_cheque) {
+            \App\Models\Cheque::create([
+                'cheque_number' => $request->cheque_number,
+                'sender_name' => $request->cheque_sender_name,
+                'receiver_name' => $request->cheque_receiver_name,
+                'party_name' => $request->cheque_sender_name,
+                'amount' => $request->payment_amount,
+                'due_date' => $request->cheque_due_date,
+                'type' => 'incoming',
+                'status' => 'pending',
+            ]);
+        } else {
+            // Create individual payment record (this updates bank balance and records transaction)
+            \App\Models\SalePayment::create([
+                'sale_id' => $sale->id,
+                'bank_id' => $request->bank_id,
+                'amount' => $request->payment_amount,
+                'date' => $request->payment_date,
+            ]);
+            $sale->bank_id = $request->bank_id; // Set last used bank
+        }
 
         // Update the sale model totals
         $sale->paid_amount += $request->payment_amount;
-        $sale->bank_id = $request->bank_id; // Set last used bank
         $sale->due_amount = $sale->amount - $sale->paid_amount;
 
         if ($sale->due_amount <= 0) {

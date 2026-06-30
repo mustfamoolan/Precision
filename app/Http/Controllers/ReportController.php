@@ -70,27 +70,63 @@ class ReportController extends Controller
             ->limit(5)
             ->get();
 
+        // Fetch Bank Balances
+        $banksSummary = \App\Models\Bank::select('name', 'balance')->get();
+
         // Full Ledger Data (Unified query for pagination)
         $salesQuery = DB::table('sales')
             ->whereBetween('date', [$startDate, $endDate])
-            ->select('date', 'customer_name as name', 'invoice_number as reference', 'amount', 'paid_amount', 'due_amount', DB::raw("'sale' as type"), 'id');
+            ->select(
+                'date', 
+                'customer_name as name', 
+                'invoice_number as reference', 
+                DB::raw('NULL as bank_name'),
+                'amount as total', 
+                DB::raw('0 as paid'), 
+                'amount as due', 
+                DB::raw("'pending' as status"),
+                DB::raw("'sale' as type"), 
+                'id'
+            );
+
+        $paymentsQuery = DB::table('sale_payments')
+            ->join('sales', 'sale_payments.sale_id', '=', 'sales.id')
+            ->join('banks', 'sale_payments.bank_id', '=', 'banks.id')
+            ->whereBetween('sale_payments.date', [$startDate, $endDate])
+            ->select(
+                'sale_payments.date', 
+                'sales.customer_name as name', 
+                'sales.invoice_number as reference', 
+                'banks.name as bank_name',
+                DB::raw('0 as total'), 
+                'sale_payments.amount as paid', 
+                DB::raw('0 as due'), 
+                DB::raw("'paid' as status"),
+                DB::raw("'payment' as type"), 
+                'sale_payments.id'
+            );
 
         $expensesQuery = DB::table('expenses')
             ->leftJoin('employees', 'expenses.employee_id', '=', 'employees.id')
+            ->leftJoin('banks', 'expenses.bank_id', '=', 'banks.id')
             ->whereBetween('expenses.date', [$startDate, $endDate])
             ->select(
                 'expenses.date', 
                 DB::raw("CONCAT(expenses.description, ' (', IFNULL(employees.name, 'System'), ')') as name"), 
                 'expenses.expense_number as reference',
-                'expenses.amount', 
-                'expenses.amount as paid_amount', 
-                DB::raw('0 as due_amount'), 
+                'banks.name as bank_name',
+                'expenses.amount as total', 
+                'expenses.amount as paid', 
+                DB::raw('0 as due'), 
+                'expenses.status',
                 DB::raw("'expense' as type"),
                 'expenses.id'
             );
 
+        $unifiedQuery = $salesQuery->unionAll($paymentsQuery)->unionAll($expensesQuery);
+
         if ($request->has('all')) {
-            $ledgerData = $salesQuery->unionAll($expensesQuery)
+            $ledgerData = $unifiedQuery
                 ->orderByDesc('date')
                 ->orderByDesc('id')
                 ->get();
@@ -104,12 +140,13 @@ class ReportController extends Controller
                     'start_date' => $startDate->format('Y-m-d'),
                     'end_date' => $endDate->format('Y-m-d'),
                     'period_label' => $startDate->format('M d') . ' - ' . $endDate->format('M d, Y'),
+                    'banks' => $banksSummary
                 ],
                 'ledger' => $ledgerData,
             ]);
         }
 
-        $ledger = $salesQuery->unionAll($expensesQuery)
+        $ledger = $unifiedQuery
             ->orderByDesc('date')
             ->orderByDesc('id')
             ->paginate(15)
@@ -125,6 +162,7 @@ class ReportController extends Controller
                 'start_date' => $startDate->format('Y-m-d'),
                 'end_date' => $endDate->format('Y-m-d'),
                 'period_label' => $startDate->format('M d') . ' - ' . $endDate->format('M d, Y'),
+                'banks' => $banksSummary
             ],
             'cash_flow' => $cashFlow,
             'aging' => $aging,
@@ -160,23 +198,56 @@ class ReportController extends Controller
         // Full Ledger Data (Unified query)
         $salesQuery = DB::table('sales')
             ->whereBetween('date', [$startDate, $endDate])
-            ->select('date', 'customer_name as name', 'invoice_number as reference', 'amount', 'paid_amount', 'due_amount', DB::raw("'sale' as type"), 'id');
+            ->select(
+                'date', 
+                'customer_name as name', 
+                'invoice_number as reference', 
+                DB::raw('NULL as bank_name'),
+                'amount as total', 
+                DB::raw('0 as paid'), 
+                'amount as due', 
+                DB::raw("'pending' as status"),
+                DB::raw("'sale' as type"), 
+                'id'
+            );
+
+        $paymentsQuery = DB::table('sale_payments')
+            ->join('sales', 'sale_payments.sale_id', '=', 'sales.id')
+            ->join('banks', 'sale_payments.bank_id', '=', 'banks.id')
+            ->whereBetween('sale_payments.date', [$startDate, $endDate])
+            ->select(
+                'sale_payments.date', 
+                'sales.customer_name as name', 
+                'sales.invoice_number as reference', 
+                'banks.name as bank_name',
+                DB::raw('0 as total'), 
+                'sale_payments.amount as paid', 
+                DB::raw('0 as due'), 
+                DB::raw("'paid' as status"),
+                DB::raw("'payment' as type"), 
+                'sale_payments.id'
+            );
 
         $expensesQuery = DB::table('expenses')
             ->leftJoin('employees', 'expenses.employee_id', '=', 'employees.id')
+            ->leftJoin('banks', 'expenses.bank_id', '=', 'banks.id')
             ->whereBetween('expenses.date', [$startDate, $endDate])
             ->select(
                 'expenses.date', 
                 DB::raw("CONCAT(expenses.description, ' (', IFNULL(employees.name, 'System'), ')') as name"), 
                 'expenses.expense_number as reference',
-                'expenses.amount', 
-                'expenses.amount as paid_amount', 
-                DB::raw('0 as due_amount'), 
+                'banks.name as bank_name',
+                'expenses.amount as total', 
+                'expenses.amount as paid', 
+                DB::raw('0 as due'), 
+                'expenses.status',
                 DB::raw("'expense' as type"),
                 'expenses.id'
             );
 
-        $ledgerData = $salesQuery->unionAll($expensesQuery)
+        $unifiedQuery = $salesQuery->unionAll($paymentsQuery)->unionAll($expensesQuery);
+
+        $ledgerData = $unifiedQuery
             ->orderByDesc('date')
             ->orderByDesc('id')
             ->get();
@@ -191,6 +262,7 @@ class ReportController extends Controller
                 'start_date' => $startDate->format('Y-m-d'),
                 'end_date' => $endDate->format('Y-m-d'),
                 'period_label' => $startDate->format('M d') . ' - ' . $endDate->format('M d, Y'),
+                'banks' => \App\Models\Bank::select('name', 'balance')->get()
             ],
             'ledger' => $ledgerData,
         ]);

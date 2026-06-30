@@ -153,16 +153,43 @@ const exportPDF = async () => {
         const addLine = () => { doc.setDrawColor(220, 220, 220); doc.line(14, y, W - 14, y); y += 5; };
         
         const addRow = (cols, widths, isBold = false) => {
-            if (y > 270) { 
-                doc.addPage(); 
-                y = 20; 
-            }
             doc.setFontSize(9);
             doc.setFont('helvetica', isBold ? 'bold' : 'normal');
             doc.setTextColor(50, 50, 80);
+
+            // Split text for each column and find max height
+            let rowLines = [];
+            let maxLinesCount = 1;
+            
+            cols.forEach((col, i) => {
+                // Give a 5mm right margin to ensure text doesn't touch the next column
+                let lines = doc.splitTextToSize(String(col), widths[i] - 5);
+                rowLines.push(lines);
+                if (lines.length > maxLinesCount) {
+                    maxLinesCount = lines.length;
+                }
+            });
+
+            let rowHeight = maxLinesCount * 4; // Approx 4mm per line
+
+            if (y + rowHeight > 270) { 
+                doc.addPage(); 
+                y = 20; 
+            }
+
             let x = 14;
-            cols.forEach((col, i) => { doc.text(String(col), x, y); x += widths[i]; });
-            y += 7;
+            rowLines.forEach((lines, i) => { 
+                doc.text(lines, x, y); 
+                x += widths[i]; 
+            });
+            
+            y += Math.max(6, rowHeight + 2);
+            
+            // Add subtle row border
+            doc.setDrawColor(235, 235, 235);
+            doc.setLineWidth(0.2);
+            doc.line(14, y - 2, W - 14, y - 2);
+            y += 2;
         };
 
         // ── Header ──────────────────────────────────────────────────────────────
@@ -179,69 +206,68 @@ const exportPDF = async () => {
         doc.text(`Generated: ${new Date().toLocaleDateString('en-AE')}`, W - 55, 25);
         y = 42;
 
-        // ── Summary ─────────────────────────────────────────────────────────────
-        const colsCount = 4;
-        const gap = 3;
-        const boxW = (W - 28 - (colsCount - 1) * gap) / colsCount;
-        const boxH = 20;
+        // ── Summary (Compact Text Instead of Cards) ───────────────────────────
+        doc.setFontSize(8); doc.setTextColor(100, 116, 139); doc.setFont('helvetica', 'bold');
+        doc.text('SALES (TOTAL)', 14, y + 5);
+        doc.text('SALES (PAID)', 50, y + 5);
+        doc.text('SALES (DUE)', 85, y + 5);
+        doc.text('EXPENSES', 120, y + 5);
+        
+        doc.setFontSize(10); doc.setFont('helvetica', 'bold');
+        doc.setTextColor(30, 41, 59); doc.text(fmt(summaryData.total_sales), 14, y + 11);
+        doc.setTextColor(16, 185, 129); doc.text(fmt(summaryData.total_sales_paid), 50, y + 11);
+        doc.setTextColor(217, 119, 6); doc.text(fmt(summaryData.total_sales_due), 85, y + 11);
+        doc.setTextColor(239, 68, 68); doc.text(fmt(summaryData.total_expenses), 120, y + 11);
+        
+        y += 20;
 
-        // Box 1: Total Sales
-        doc.setFillColor(248, 250, 252);
-        doc.roundedRect(14, y, boxW, boxH, 2, 2, 'F');
-        doc.setFontSize(7); doc.setTextColor(100, 116, 139); doc.setFont('helvetica', 'bold');
-        doc.text('TOTAL SALES', 14 + 3, y + 7);
-        doc.setFontSize(10); doc.setTextColor(30, 41, 59); doc.setFont('helvetica', 'bold');
-        doc.text(fmt(summaryData.total_sales), 14 + 3, y + 15);
+        // ── Cash & Bank Balances (Compact) ──────────────────────────────────────
+        if (summaryData.banks && summaryData.banks.length > 0) {
+            // Section Title
+            doc.setFontSize(8); doc.setTextColor(100, 116, 139); doc.setFont('helvetica', 'bold');
+            doc.text('CASH & BANK BALANCES', 14, y);
+            y += 7;
+            
+            let bx = 14;
+            summaryData.banks.forEach(bank => {
+                let nameStr = bank.name.toUpperCase();
+                
+                // Wrap to next line if we exceed 4 columns (14, 59, 104, 149)
+                if (bx > 150) { 
+                    bx = 14; 
+                    y += 14; 
+                }
+                
+                // Bank Name
+                doc.setFontSize(8); doc.setTextColor(100, 116, 139); doc.setFont('helvetica', 'bold');
+                doc.text(nameStr.length > 20 ? nameStr.substring(0, 20) + '...' : nameStr, bx, y);
+                
+                // Balance
+                doc.setFontSize(10); doc.setTextColor(30, 41, 59); doc.setFont('helvetica', 'bold');
+                doc.text(fmt(bank.balance), bx, y + 6);
+                
+                bx += 45;
+            });
+            y += 15;
+        }
 
-        // Box 2: Paid Sales
-        const x2 = 14 + boxW + gap;
-        doc.setFillColor(248, 250, 252);
-        doc.roundedRect(x2, y, boxW, boxH, 2, 2, 'F');
-        doc.setFontSize(7); doc.setTextColor(100, 116, 139); doc.setFont('helvetica', 'bold');
-        doc.text('PAID SALES', x2 + 3, y + 7);
-        doc.setFontSize(10); doc.setTextColor(16, 185, 129); doc.setFont('helvetica', 'bold');
-        doc.text(fmt(summaryData.total_sales_paid), x2 + 3, y + 15);
+        // ── Section 1: Transaction Ledger ────────────────────────────────────────
+        addTitle('TRANSACTION LEDGER', 13, [30, 41, 59]); y += 2;
+        
+        // Solid line under title
+        doc.setDrawColor(200, 200, 200); doc.setLineWidth(0.5);
+        doc.line(14, y, W - 14, y); y += 5;
 
-        // Box 3: Unpaid (Due)
-        const x3 = x2 + boxW + gap;
-        doc.setFillColor(248, 250, 252);
-        doc.roundedRect(x3, y, boxW, boxH, 2, 2, 'F');
-        doc.setFontSize(7); doc.setTextColor(100, 116, 139); doc.setFont('helvetica', 'bold');
-        doc.text('UNPAID (DUE)', x3 + 3, y + 7);
-        doc.setFontSize(10); doc.setTextColor(217, 119, 6); doc.setFont('helvetica', 'bold');
-        doc.text(fmt(summaryData.total_sales_due), x3 + 3, y + 15);
-
-        // Box 4: Total Expenses
-        const x4 = x3 + boxW + gap;
-        doc.setFillColor(248, 250, 252);
-        doc.roundedRect(x4, y, boxW, boxH, 2, 2, 'F');
-        doc.setFontSize(7); doc.setTextColor(100, 116, 139); doc.setFont('helvetica', 'bold');
-        doc.text('TOTAL EXPENSES', x4 + 3, y + 7);
-        doc.setFontSize(10); doc.setTextColor(239, 68, 68); doc.setFont('helvetica', 'bold');
-        doc.text(fmt(summaryData.total_expenses), x4 + 3, y + 15);
-
-        y += boxH + 10;
-
-        // ── Section 1: Sales Invoices ────────────────────────────────────────────
-        addTitle('SECTION 1 — SALES INVOICES', 13, [30, 41, 59]); y += 2;
-        addLine();
-        const salesCols = ['Date', 'Customer', 'Inv #', 'Total', 'Paid', 'Due'];
-        const salesW    = [25, 55, 25, 25, 25, 25];
-        addRow(salesCols, salesW, true); addLine();
-        allLedger.filter(i => i.type === 'sale').forEach(item => {
-            addRow([fmtDate(item.date), item.name, item.reference, fmt(item.amount), fmt(item.paid_amount), fmt(item.due_amount)], salesW);
-        });
-        y += 5;
-
-        // ── Section 2: Expenses ──────────────────────────────────────────────────
-        if (y > 200) { doc.addPage(); y = 20; }
-        addTitle('SECTION 2 — EXPENSES', 13, [30, 41, 59]); y += 2;
-        addLine();
-        const expCols = ['Date', 'Description', 'Ref #', 'Amount'];
-        const expW    = [25, 85, 25, 35];
-        addRow(expCols, expW, true); addLine();
-        allLedger.filter(i => i.type === 'expense').forEach(item => {
-            addRow([fmtDate(item.date), item.name, item.reference, fmt(item.amount)], expW);
+        const cols = ['Date', 'Description', 'Ref #', 'Total', 'Paid', 'Due', 'Bank'];
+        const widths = [20, 45, 20, 24, 24, 24, 25]; // Total: 182
+        addRow(cols, widths, true);
+        
+        allLedger.forEach(item => {
+            let total = item.total > 0 ? fmt(item.total) : '-';
+            let paid = item.paid > 0 ? fmt(item.paid) : '-';
+            let due = item.due > 0 ? fmt(item.due) : '-';
+            let bName = item.bank_name || '-';
+            addRow([fmtDate(item.date), item.name, item.reference, total, paid, due, bName], widths);
         });
         y += 5;
 
@@ -413,9 +439,11 @@ const exportPDF = async () => {
                             <th class="py-6 px-8">Transaction Name</th>
                             <th class="py-6 px-8">Reference #</th>
                             <th class="py-6 px-8">Type</th>
-                            <th class="py-6 px-8">Total</th>
-                            <th class="py-6 px-8">Paid</th>
+                            <th class="py-6 px-8 text-right">Total</th>
+                            <th class="py-6 px-8 text-right">Paid</th>
                             <th class="py-6 px-8 text-right">Due</th>
+                            <th class="py-6 px-8">Bank</th>
+                            <th class="py-6 px-8 text-center">Status</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-50">
@@ -430,16 +458,22 @@ const exportPDF = async () => {
                             <td class="py-6 px-8">
                                 <span
                                     class="inline-block px-4 py-1.5 rounded-full text-sm font-black uppercase tracking-widest"
-                                    :class="item.type === 'sale'
-                                        ? 'bg-emerald-50 text-emerald-600'
-                                        : 'bg-rose-50 text-rose-600'"
+                                    :class="item.type === 'sale' ? 'bg-blue-50 text-blue-600' : (item.type === 'payment' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600')"
                                 >{{ item.type }}</span>
                             </td>
-                            <td class="py-6 px-8 font-black text-slate-900 whitespace-nowrap text-2xl">{{ fmt(item.amount) }}</td>
-                            <td class="py-6 px-8 font-bold text-emerald-600 whitespace-nowrap text-2xl">{{ fmt(item.paid_amount) }}</td>
+                            <td class="py-6 px-8 font-black text-slate-900 whitespace-nowrap text-2xl text-right">{{ item.total > 0 ? fmt(item.total) : '—' }}</td>
+                            <td class="py-6 px-8 font-bold text-emerald-600 whitespace-nowrap text-2xl text-right">{{ item.paid > 0 ? fmt(item.paid) : '—' }}</td>
                             <td class="py-6 px-8 text-right font-bold whitespace-nowrap text-2xl"
-                                :class="item.due_amount > 0 ? 'text-rose-600' : 'text-slate-300'"
-                            >{{ fmt(item.due_amount) }}</td>
+                                :class="item.due > 0 ? 'text-rose-600' : 'text-slate-300'"
+                            >{{ item.due > 0 ? fmt(item.due) : '—' }}</td>
+                            <td class="py-6 px-8 text-lg font-bold text-slate-500 whitespace-nowrap">{{ item.bank_name || '—' }}</td>
+                            <td class="py-6 px-8 text-center">
+                                <span v-if="item.status" class="inline-block px-3 py-1 rounded-lg text-xs font-black uppercase tracking-widest"
+                                      :class="item.status === 'paid' ? 'bg-emerald-500 text-white' : (item.status === 'partial' ? 'bg-amber-500 text-white' : (item.status === 'pending' ? 'bg-rose-500 text-white' : 'bg-slate-200 text-slate-600'))">
+                                    {{ item.status }}
+                                </span>
+                                <span v-else>—</span>
+                            </td>
                         </tr>
                         <tr v-if="ledger.data.length === 0">
                             <td colspan="7" class="py-20 text-center italic text-slate-400 font-bold">No transactions in this period.</td>

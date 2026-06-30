@@ -87,6 +87,11 @@ class ExpenseController extends Controller
             'payment_method' => 'required|string',
             'status' => 'required|string',
             'bank_id' => 'nullable|exists:banks,id',
+            'is_cheque' => 'nullable|boolean',
+            'cheque_number' => 'nullable|required_if:is_cheque,true|string',
+            'cheque_due_date' => 'nullable|required_if:is_cheque,true|date',
+            'cheque_sender_name' => 'nullable|required_if:is_cheque,true|string',
+            'cheque_receiver_name' => 'nullable|required_if:is_cheque,true|string',
         ]);
 
         if (empty($validated['expense_number'])) {
@@ -95,7 +100,28 @@ class ExpenseController extends Controller
             $validated['expense_number'] = $nextId;
         }
 
-        $expense = Expense::create($validated);
+        if (!empty($request->is_cheque)) {
+            $bankIdForCheque = $validated['bank_id'];
+            $validated['bank_id'] = null; // Prevent ExpenseObserver from deducting balance immediately
+            $validated['payment_method'] = 'Cheque';
+            
+            $expense = Expense::create($validated);
+            
+            \App\Models\Cheque::create([
+                'cheque_number' => $request->cheque_number,
+                'sender_name' => $request->cheque_sender_name,
+                'receiver_name' => $request->cheque_receiver_name,
+                'party_name' => $request->cheque_receiver_name,
+                'amount' => $expense->amount,
+                'due_date' => $request->cheque_due_date,
+                'type' => 'outgoing',
+                'bank_id' => $bankIdForCheque,
+                'status' => 'pending',
+            ]);
+        } else {
+            $expense = Expense::create($validated);
+        }
+        
         \App\Services\ActivityLogger::log('created', 'Recorded new expense: ' . $expense->description . ' (' . $expense->amount . ')', $expense);
 
         return redirect()->back();

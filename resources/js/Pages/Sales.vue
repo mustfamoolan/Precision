@@ -61,15 +61,22 @@ const form = useForm({
     vat: 0,
     has_tax: true,
     notes: '',
-    customer_address: '',
     currency: 'AED',
     trn: '100267536900003',
+    is_cheque: false,
+    cheque_number: '',
+    cheque_due_date: new Date().toISOString().substr(0, 10),
 });
 
 const paymentForm = useForm({
     payment_amount: '',
     payment_date: new Date().toISOString().substr(0, 10),
     bank_id: '',
+    is_cheque: false,
+    cheque_number: '',
+    cheque_due_date: new Date().toISOString().substr(0, 10),
+    cheque_sender_name: '',
+    cheque_receiver_name: 'Precision (Internal)',
 });
 
 const openModal = (sale = null) => {
@@ -107,6 +114,11 @@ const openModal = (sale = null) => {
         form.currency = 'AED';
         form.trn = '100267536900003';
     }
+    form.is_cheque = false;
+    form.cheque_number = '';
+    form.cheque_due_date = new Date().toISOString().substr(0, 10);
+    form.cheque_sender_name = sale ? sale.customer_name : '';
+    form.cheque_receiver_name = 'Precision (Internal)';
     showModal.value = true;
 };
 
@@ -191,6 +203,11 @@ const openPaymentModal = (sale) => {
     paymentForm.payment_amount = sale.due_amount > 0 ? sale.due_amount : '';
     paymentForm.payment_date = new Date().toISOString().substr(0, 10);
     paymentForm.bank_id = sale.bank_id || '';
+    paymentForm.is_cheque = false;
+    paymentForm.cheque_number = '';
+    paymentForm.cheque_due_date = new Date().toISOString().substr(0, 10);
+    paymentForm.cheque_sender_name = sale.customer_name || '';
+    paymentForm.cheque_receiver_name = 'Precision (Internal)';
     showPaymentModal.value = true;
 };
 
@@ -989,13 +1006,35 @@ const statuses = [{label: 'All Status', value: 'all'}, {label: 'Paid', value: 'p
                     <TextInput v-model="paymentForm.payment_amount" type="number" step="0.01" prefix="AED" placeholder="0.00" />
                 </FormField>
 
-                <FormField label="Deposit to Account" :error="paymentForm.errors.bank_id" required>
-                    <SelectInput 
-                        v-model="paymentForm.bank_id" 
-                        :options="banks.map(b => ({ label: b.name, value: b.id }))" 
-                        placeholder="Select Bank/Cash Account..."
-                    />
-                </FormField>
+                <div class="p-4 bg-slate-50 border border-slate-200 rounded-2xl mb-4">
+                    <label class="flex items-center gap-3 cursor-pointer">
+                        <input type="checkbox" v-model="paymentForm.is_cheque" class="w-5 h-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+                        <span class="text-sm font-bold text-slate-700">Receive via Cheque?</span>
+                    </label>
+                    <div v-if="!paymentForm.is_cheque" class="mt-4 animate-in fade-in slide-in-from-top-2">
+                        <FormField label="Deposit to Account" :error="paymentForm.errors.bank_id" required>
+                            <SelectInput 
+                                v-model="paymentForm.bank_id" 
+                                :options="banks.map(b => ({ label: b.name, value: b.id }))" 
+                                placeholder="Select Bank/Cash Account..."
+                            />
+                        </FormField>
+                    </div>
+                    <div v-if="paymentForm.is_cheque" class="grid grid-cols-2 gap-4 mt-4 animate-in fade-in slide-in-from-top-2">
+                        <FormField label="Cheque Number" :error="paymentForm.errors.cheque_number" required>
+                            <TextInput v-model="paymentForm.cheque_number" placeholder="e.g. 123456" />
+                        </FormField>
+                        <FormField label="Due Date" :error="paymentForm.errors.cheque_due_date" required>
+                            <TextInput v-model="paymentForm.cheque_due_date" type="date" />
+                        </FormField>
+                        <FormField label="Sender Name" :error="paymentForm.errors.cheque_sender_name" required>
+                            <TextInput v-model="paymentForm.cheque_sender_name" placeholder="Customer Name" />
+                        </FormField>
+                        <FormField label="Receiver Name" :error="paymentForm.errors.cheque_receiver_name" required>
+                            <TextInput v-model="paymentForm.cheque_receiver_name" placeholder="Precision (Internal)" />
+                        </FormField>
+                    </div>
+                </div>
 
                 <div class="pt-6 flex justify-end gap-3 border-t border-slate-100 mt-6">
                     <SecondaryButton @click="showPaymentModal = false" type="button">Cancel</SecondaryButton>
@@ -1174,26 +1213,51 @@ const statuses = [{label: 'All Status', value: 'all'}, {label: 'Paid', value: 'p
                                 </p>
                             </div>
                             <div class="w-40">
-                                <FormField label="Paid Amount" :error="form.errors.paid_amount">
+                                <FormField label="Paid Amount" :error="form.errors.paid_amount" label-class="text-slate-500">
                                     <TextInput 
                                         v-model="form.paid_amount" 
                                         type="number" 
                                         step="0.01" 
-                                        class="!bg-white !border-slate-200 !text-slate-900" 
+                                        class="!bg-white !border-slate-200 !text-slate-900 !placeholder-slate-300" 
                                         placeholder="0.00" 
                                     />
                                 </FormField>
                             </div>
+                            </div>
+                        </div>
+
+                        <div v-if="form.paid_amount > 0" class="mt-4 p-4 bg-slate-100 rounded-2xl border border-slate-200">
+                            <label class="flex items-center gap-3 cursor-pointer mb-2">
+                                <input type="checkbox" v-model="form.is_cheque" class="w-5 h-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+                                <span class="text-sm font-bold text-slate-700">Receive via Cheque? (Creates an Incoming Cheque)</span>
+                            </label>
+                            
+                            <div v-if="!form.is_cheque" class="animate-in fade-in slide-in-from-top-2 mt-3">
+                                <FormField label="Deposit to Bank/Cash" :error="form.errors.bank_id" required>
+                                    <SelectInput 
+                                        v-model="form.bank_id" 
+                                        :options="banks.map(b => ({ label: b.name, value: b.id }))" 
+                                        placeholder="Select Bank/Cash Account..."
+                                    />
+                                </FormField>
+                            </div>
+
+                            <div v-if="form.is_cheque" class="grid grid-cols-2 gap-4 mt-3 animate-in fade-in slide-in-from-top-2">
+                                <FormField label="Cheque Number" :error="form.errors.cheque_number" required>
+                                    <TextInput v-model="form.cheque_number" placeholder="e.g. 123456" />
+                                </FormField>
+                                <FormField label="Due Date" :error="form.errors.cheque_due_date" required>
+                                    <TextInput v-model="form.cheque_due_date" type="date" />
+                                </FormField>
+                                <FormField label="Sender Name" :error="form.errors.cheque_sender_name" required>
+                                    <TextInput v-model="form.cheque_sender_name" placeholder="Customer Name" />
+                                </FormField>
+                                <FormField label="Receiver Name" :error="form.errors.cheque_receiver_name" required>
+                                    <TextInput v-model="form.cheque_receiver_name" placeholder="Precision (Internal)" />
+                                </FormField>
+                            </div>
                         </div>
                     </div>
-                </div>
-
-                <FormField label="Bank/Account (Optional)" :error="form.errors.bank_id">
-                    <SelectInput 
-                        v-model="form.bank_id" 
-                        :options="[{label: 'None / Cash', value: ''}, ...banks.map(b => ({ label: b.name, value: b.id }))]" 
-                    />
-                </FormField>
 
                 <FormField label="Notes / Remarks (Optional)" :error="form.errors.notes">
                     <TextArea v-model="form.notes" placeholder="Enter any additional notes..." rows="3" />

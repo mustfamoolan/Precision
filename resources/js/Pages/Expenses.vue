@@ -40,6 +40,11 @@ const form = useForm({
     payment_method: 'Cash',
     status: 'Paid',
     bank_id: '',
+    is_cheque: false,
+    cheque_number: '',
+    cheque_due_date: new Date().toISOString().substr(0, 10),
+    cheque_sender_name: 'Precision (Internal)',
+    cheque_receiver_name: '',
 });
 
 const submit = () => {
@@ -54,6 +59,11 @@ const submit = () => {
             form.date = new Date().toISOString().substr(0, 10);
             form.payment_method = 'Cash';
             form.status = 'Paid';
+            form.is_cheque = false;
+            form.cheque_number = '';
+            form.cheque_due_date = new Date().toISOString().substr(0, 10);
+            form.cheque_sender_name = 'Precision (Internal)';
+            form.cheque_receiver_name = '';
         },
     });
 };
@@ -402,16 +412,37 @@ const statuses = ['Paid', 'Partial', 'Unpaid'];
                 </div>
 
                 <div class="grid grid-cols-2 gap-4">
-                    <FormField label="Payment Method" :error="form.errors.bank_id" required>
+                    <FormField label="Payment Method" :error="form.errors.bank_id" :required="!form.is_cheque">
                         <SelectInput 
                             v-model="form.bank_id" 
                             :options="banks.map(b => ({label: b.name, value: b.id}))" 
-                            placeholder="Select Payment Source..."
+                            :placeholder="form.is_cheque ? 'Select Source Bank (Required for Cheque)' : 'Select Payment Source...'"
                         />
                     </FormField>
                     <FormField label="Status" :error="form.errors.status" required>
                         <SelectInput v-model="form.status" :options="statuses.map(s => ({label: s, value: s}))" />
                     </FormField>
+                </div>
+
+                <div class="p-4 bg-slate-50 border border-slate-200 rounded-2xl">
+                    <label class="flex items-center gap-3 cursor-pointer">
+                        <input type="checkbox" v-model="form.is_cheque" class="w-5 h-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+                        <span class="text-sm font-bold text-slate-700">Pay via Cheque? (Creates an Outgoing Cheque)</span>
+                    </label>
+                    <div v-if="form.is_cheque" class="grid grid-cols-2 gap-4 mt-4 animate-in fade-in slide-in-from-top-2">
+                        <FormField label="Cheque Number" :error="form.errors.cheque_number" required>
+                            <TextInput v-model="form.cheque_number" placeholder="e.g. 123456" />
+                        </FormField>
+                        <FormField label="Due Date" :error="form.errors.cheque_due_date" required>
+                            <TextInput v-model="form.cheque_due_date" type="date" />
+                        </FormField>
+                        <FormField label="Sender Name" :error="form.errors.cheque_sender_name" required>
+                            <TextInput v-model="form.cheque_sender_name" placeholder="Precision (Internal)" />
+                        </FormField>
+                        <FormField label="Receiver Name" :error="form.errors.cheque_receiver_name" required>
+                            <TextInput v-model="form.cheque_receiver_name" placeholder="Supplier / Payee Name" />
+                        </FormField>
+                    </div>
                 </div>
 
                 <div class="pt-6 flex justify-end gap-3 border-t border-slate-100 mt-6">
